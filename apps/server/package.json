@@ -1,0 +1,11 @@
+{
+  "name": "@app/server",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@app/shared": "*"
+  }
+}
