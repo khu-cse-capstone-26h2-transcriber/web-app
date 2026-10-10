@@ -1,4 +1,21 @@
+# 의존성과 빌드 결과물
 node_modules/
 dist/
+coverage/
+*.tsbuildinfo
+
+# 환경변수 (예시 파일만 커밋)
 .env
+.env.*
+!.env.example
+
+# 로그
+*.log
+
+# macOS
+.DS_Store
+
+# Claude Code (로컬 전용)
 CLAUDE.md
+.claude/settings.local.json
+.claude/worktrees/
