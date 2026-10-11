@@ -8,21 +8,40 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 협의: 팀원 합의가 필요한 파트입니다. `[AI]` = 박지윤, `[하드웨어]` = 김범수.
 - 지침서는 `docs/guides/Txx.md`에 있습니다.
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
+- 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-10
+마지막 갱신: 2026-10-11
 
-## 오늘의 작업 (2026-10-10) — T01 모노레포 스캐폴딩
+## 오늘의 작업 (2026-10-11) — T05 STT 어댑터 인터페이스와 mock STT
 
-지침서: `docs/guides/T01.md`
+지침서: `docs/guides/T05.md`
 
-- [x] 1. 폴더 3개 생성, `git init -b main`
-- [x] 2. 루트 `package.json` 워크스페이스 설정, 개발 도구 설치
-- [x] 3. `tsconfig.base.json`과 패키지별 `package.json`·`tsconfig.json`
-- [x] 4. 소스 파일 3개 (`shared`, `server`, `web`)
-- [x] 5. `.env.example`, `.gitignore`
-- [x] 6. `CLAUDE.md`, `TODO.md`, `docs/guides/T01.md`를 저장소에 배치
-- [x] 7. `npm install`, `npm run typecheck`, `npm run dev:server` 확인
-- [x] 8. `git commit -m "chore: 모노레포 스캐폴딩"`
+- [x] 1. 브랜치 `feat/t05-stt-adapter` 생성
+- [x] 2. `packages/shared/src/stt.ts`에 `SttEvent` 타입
+- [x] 3. `packages/shared/src/index.ts`에서 타입 내보내기
+- [x] 4. `apps/server/src/stt/adapter.ts`에 `SttAdapter` 인터페이스
+- [x] 5. `apps/server/src/stt/mock.ts`에 `MockSttAdapter`
+- [x] 6. `apps/server/src/stt/demo.ts` 확인용 스크립트
+- [x] 7. 루트와 서버 `package.json`에 `dev:stt` 스크립트 추가
+- [x] 8. `npm run typecheck`, `npm run dev:stt`, `npm run dev:server` 확인, 커밋
+- [x] 9. 일지, 지침서 '결과', `TODO.md` 기록
+
+## 내일 할 작업 (2026-10-12)
+
+2026-10-11 작업을 마치며 정리한 목록입니다. 다음 세션은 이 목록부터 확인합니다.
+
+### 꼭 할 일
+
+- [ ] **D4 협의 요청** (사용자가 직접) — 박지윤(AI), 김범수(하드웨어)에게 STT 연동 방식 협의를 요청합니다. T05가 끝나 D4의 '늦어도 필요한 시점'이 됐고, T19와 T20이 이 합의에 막혀 있습니다.
+  - 들고 갈 초안: `docs/project-overview.md`의 'STT 이벤트' 절
+  - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
+- [ ] **T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더** — 결정 없이 바로 시작할 수 있는 다음 P0 작업이고, T03과 T04가 여기에 막혀 있습니다. 지침서 `docs/guides/T02.md`부터 씁니다. 노트북에 Docker 29.2.0과 Docker Compose v5.0.2가 설치되어 있습니다.
+
+### 확인할 것
+
+- [ ] `main` push — 로컬 `main`이 원격(`origin/main`)보다 커밋 4개 앞서 있습니다. push는 사용자가 지시할 때 합니다.
+- [ ] D2(서버 프레임워크), D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를, T02를 끝내고 D2를 정하면 T04를 시작할 수 있습니다.
+- [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 
 ## 기능별 작업
 
@@ -35,7 +54,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### STT 연동
 
-- [ ] T05 STT 어댑터 인터페이스와 mock STT — P0 · 단계 2 · 선행: T01 · 협의: 없음 · 이 인터페이스가 T19 협의의 초안
+- [x] T05 STT 어댑터 인터페이스와 mock STT — P0 · 단계 2 · 선행: T01 · 협의: 없음 · 이 인터페이스가 T19 협의의 초안
 - [ ] T19 STT 연동 인터페이스 합의와 문서화 — P0 · 단계 3 · 선행: T05 · 협의: **[AI, 하드웨어]** (D4)
 - [ ] T20 실제 STT 어댑터로 mock 교체 — P0 · 단계 4 · 선행: T05, T19 · 협의: **[AI]**
 
@@ -89,6 +108,9 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-11 | 프로젝트 문서 | 완료 | `docs/project-overview.md` 작성(프로젝트 소개, 구성, STT 이벤트 필드와 사용 예시) | 예정으로 적은 부분은 해당 작업 완료 때 갱신 | T19, T02 |
+| 2026-10-11 | T05 | 완료 | 브랜치 `feat/t05-stt-adapter`에서 `SttEvent` 타입, `SttAdapter` 인터페이스, `MockSttAdapter`, `dev:stt` 추가. 완료 기준 5개 통과, `main`에 병합. 지침서와 다른 점: 워크트리 작업이라 `git switch main` 생략 | push 전 | T19(D4 협의), T02 |
+| 2026-10-11 | T05 지침서 | 완료 | `docs/guides/T05.md` 작성, 코드 사전 검증, `main`에 병합 | push 전 | T05 구현 |
 | 2026-10-10 | gitignore 정리 | 완료 | 브랜치 `chore/gitignore-claude-md`에서 `CLAUDE.md`를 `.gitignore`에 추가하고 추적 해제. 추천 항목 6개(`.DS_Store`, `.env.*`, `*.log`, `coverage/`, `*.tsbuildinfo`, `.claude` 개인 설정) 추가, `main` 병합과 push | 이전 커밋 3개에는 `CLAUDE.md`가 남아 있음 | T02, T05 |
 | 2026-10-10 | 저장소 설정 | 완료 | GitHub private 저장소 `gwangholee507/speech-transcriber-app` 생성, `origin` 연결, `main` push. `CLAUDE.md`에 브랜치 규칙 추가(`main`에는 완성된 버전만, 기능 개발은 새 브랜치) | 브랜치 이름 규칙과 `main` 병합 방식 미정 | T02, T05 |
 | 2026-10-10 | T01 | 완료 | 폴더 구조, 설정·소스 파일 생성, 개발 도구 설치, 로컬 git 저장소와 첫 커밋. 완료 기준 5개 통과. 지침서와 다른 점: 주석을 경로 표기 대신 한국어 설명으로 작성(CLAUDE.md 규칙), `@types/node`를 Node 20에 맞춰 `^20`으로 지정(지침서는 버전 미지정), `docs/guides`·`docs/logs` 추가와 CLAUDE.md에 기록·승인·git 규칙 반영(사용자 지시) | 없음 | T02, T05 (T04는 D2, T12는 D3 결정 필요) |
