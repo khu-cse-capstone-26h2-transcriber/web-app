@@ -39,7 +39,6 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### 확인할 것
 
-- [ ] `main` push — 로컬 `main`이 원격(`origin/main`)보다 커밋 4개 앞서 있습니다. push는 사용자가 지시할 때 합니다.
 - [ ] D2(서버 프레임워크), D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를, T02를 끝내고 D2를 정하면 T04를 시작할 수 있습니다.
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 
@@ -109,8 +108,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
 | 2026-10-11 | 프로젝트 문서 | 완료 | `docs/project-overview.md` 작성(프로젝트 소개, 구성, STT 이벤트 필드와 사용 예시) | 예정으로 적은 부분은 해당 작업 완료 때 갱신 | T19, T02 |
-| 2026-10-11 | T05 | 완료 | 브랜치 `feat/t05-stt-adapter`에서 `SttEvent` 타입, `SttAdapter` 인터페이스, `MockSttAdapter`, `dev:stt` 추가. 완료 기준 5개 통과, `main`에 병합. 지침서와 다른 점: 워크트리 작업이라 `git switch main` 생략 | push 전 | T19(D4 협의), T02 |
-| 2026-10-11 | T05 지침서 | 완료 | `docs/guides/T05.md` 작성, 코드 사전 검증, `main`에 병합 | push 전 | T05 구현 |
+| 2026-10-11 | T05 | 완료 | 브랜치 `feat/t05-stt-adapter`에서 `SttEvent` 타입, `SttAdapter` 인터페이스, `MockSttAdapter`, `dev:stt` 추가. 완료 기준 5개 통과, `main`에 병합. 지침서와 다른 점: 워크트리 작업이라 `git switch main` 생략 | 없음 | T19(D4 협의), T02 |
+| 2026-10-11 | T05 지침서 | 완료 | `docs/guides/T05.md` 작성, 코드 사전 검증, `main`에 병합 | 없음 | T05 구현 |
 | 2026-10-10 | gitignore 정리 | 완료 | 브랜치 `chore/gitignore-claude-md`에서 `CLAUDE.md`를 `.gitignore`에 추가하고 추적 해제. 추천 항목 6개(`.DS_Store`, `.env.*`, `*.log`, `coverage/`, `*.tsbuildinfo`, `.claude` 개인 설정) 추가, `main` 병합과 push | 이전 커밋 3개에는 `CLAUDE.md`가 남아 있음 | T02, T05 |
 | 2026-10-10 | 저장소 설정 | 완료 | GitHub private 저장소 `gwangholee507/speech-transcriber-app` 생성, `origin` 연결, `main` push. `CLAUDE.md`에 브랜치 규칙 추가(`main`에는 완성된 버전만, 기능 개발은 새 브랜치) | 브랜치 이름 규칙과 `main` 병합 방식 미정 | T02, T05 |
 | 2026-10-10 | T01 | 완료 | 폴더 구조, 설정·소스 파일 생성, 개발 도구 설치, 로컬 git 저장소와 첫 커밋. 완료 기준 5개 통과. 지침서와 다른 점: 주석을 경로 표기 대신 한국어 설명으로 작성(CLAUDE.md 규칙), `@types/node`를 Node 20에 맞춰 `^20`으로 지정(지침서는 버전 미지정), `docs/guides`·`docs/logs` 추가와 CLAUDE.md에 기록·승인·git 규칙 반영(사용자 지시) | 없음 | T02, T05 (T04는 D2, T12는 D3 결정 필요) |
