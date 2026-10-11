@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p packages/shared",
-    "dev:server": "npm run dev -w @app/server"
+    "dev:server": "npm run dev -w @app/server",
+    "dev:stt": "npm run dev:stt -w @app/server"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
