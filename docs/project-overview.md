@@ -1,0 +1,225 @@
+# 프로젝트 설명 — speech-transcriber
+
+마지막 갱신: 2026-10-11 · 이광호
+
+이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
+
+## 무엇을 만드는가
+
+**온디바이스 스피치 트랜스크라이버**입니다. 녹음을 기기 안에서 STT(음성 인식)로 처리해 웹앱과 동기화하는 독립형 기기이고, 하드웨어는 Rubik Pi입니다. 경희대학교 캡스톤디자인(14주, 3인 팀) 프로젝트입니다.
+
+이 저장소는 **앱(웹앱 + 백엔드) 전용**입니다.
+
+| 파트 | 담당 |
+| --- | --- |
+| 앱(웹앱 + 백엔드) | 이광호 |
+| 하드웨어 | 김범수 |
+| AI 모델 | 박지윤 |
+
+## 핵심 기능
+
+1. 녹음 → 온디바이스 STT → 노트
+2. 실시간 자막/트랜스크립트 화면
+3. 세션 히스토리 조회·다운로드
+
+AI 요약, 화자 분리, 검색, 배터리 내장 휴대형, 모드 전환(일반 녹음/AI 질의)은 확장 기능이며 핵심 기능보다 먼저 만들지 않습니다.
+
+## 전체 구성
+
+음성이 텍스트가 되어 화면과 DB에 닿기까지의 흐름입니다.
+
+```mermaid
+flowchart LR
+  audio["오디오 입력<br/>(형식 미정, D4)"] --> stt["STT<br/>(지금은 mock)"]
+  stt -->|SttEvent| adapter["SttAdapter"]
+  adapter --> server["서버"]
+  server -->|"SSE: partial, final"| web["웹앱"]
+  server -->|"final만 저장"| db[("PostgreSQL")]
+  db -->|"히스토리 API"| web
+```
+
+| 구성 요소 | 위치 | 역할 | 상태 |
+| --- | --- | --- | --- |
+| STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
+| 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | 임시 진입점만 있음 (T04, T06~T11 예정) |
+| DB | 미정 | 세션과 세그먼트를 저장합니다 | 예정 (T02, T03, T08) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
+| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent` |
+
+## 기술 결정
+
+| 항목 | 결정 |
+| --- | --- |
+| 클라이언트 | React 웹앱 |
+| 백엔드 | Node.js + TypeScript, npm workspaces 모노레포 |
+| 실시간 전달 | SSE로 시작, 추후 WebSocket 전환을 고려해 설계 |
+| 사용자 모델 | 단일 사용자, 로그인 없음 |
+| DB | PostgreSQL, `pg` 라이브러리로 직접 SQL 작성 (ORM 사용 안 함) |
+| SSE 끊김 | 자동 재연결 + 화면 상단 배너 알림 |
+| 개발 환경 | 노트북에서 먼저 개발. STT·DB 주소는 환경변수로 분리 |
+| STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
+| 테스트 | Vitest, 핵심 로직만 |
+| 백엔드 위치 | Rubik Pi 안을 목표로 설계. 실측 결과에 따라 SQLite 또는 별도 서버로 바뀔 수 있음 |
+
+아직 정해지지 않은 것은 다음과 같습니다. 결정 번호는 `TODO.md`의 표기입니다.
+
+- 서버 프레임워크 (D2, T04 전)
+- 웹앱 빌드 도구 (D3, T12 전)
+- STT 호출 방법, 오디오 입력 형식, partial/final 이벤트의 최종 형식 (D4, AI·하드웨어 파트 협의)
+- Rubik Pi OS, 입출력 구성, 기기 수령 시점 (D5, 하드웨어 파트 협의)
+- 히스토리 다운로드 포맷 (D6, T11 전)
+- 팀 전체 마일스톤과 주차별 일정 (D7)
+- PostgreSQL 메모리 설정, SQLite 전환 여부 (D8, 기기 실측 후)
+
+## 폴더 구조
+
+```text
+speech-transcriber/
+├─ TODO.md                    # 작업 목록과 작업 기록
+├─ package.json               # npm workspaces, 공통 스크립트
+├─ tsconfig.base.json         # 공통 컴파일러 옵션
+├─ .env.example               # PORT, DB_URL, STT_URL
+├─ apps/
+│  ├─ server/                 # @app/server — Node.js 백엔드
+│  │  └─ src/
+│  │     ├─ index.ts          # 임시 진입점
+│  │     └─ stt/
+│  │        ├─ adapter.ts     # SttAdapter 인터페이스
+│  │        ├─ mock.ts        # MockSttAdapter
+│  │        └─ demo.ts        # mock 이벤트 확인용 스크립트
+│  └─ web/                    # @app/web — React 웹앱
+├─ packages/
+│  └─ shared/                 # @app/shared — 서버·웹 공용 타입과 상수
+│     └─ src/
+│        ├─ index.ts
+│        └─ stt.ts            # SttEvent 타입
+└─ docs/
+   ├─ project-overview.md     # 이 문서
+   ├─ guides/                 # 작업별 지침서 (Txx.md)
+   └─ logs/                   # 일자별 작업 기록 (YYYY-MM-DD.md)
+```
+
+## 실행 방법
+
+Node.js 20 기준으로 개발합니다.
+
+```bash
+npm install          # 루트에서 한 번
+npm run typecheck    # 모든 워크스페이스 타입 검사
+npm run dev:server   # 서버 실행 (지금은 준비 메시지만 출력)
+npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
+```
+
+## STT 이벤트
+
+STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 메시지 하나입니다. 타입은 `packages/shared/src/stt.ts`의 `SttEvent`이고, 서버와 웹이 같은 타입을 씁니다.
+
+지금 형식은 **초안**입니다. 최종 형식은 T19에서 AI 파트(박지윤), 하드웨어 파트(김범수)와 합의해 확정하며, 실제 STT가 내주는 형식에 따라 바뀔 수 있습니다.
+
+### 필드
+
+| 필드 | 타입 | 담는 값 |
+| --- | --- | --- |
+| `type` | `'partial'` \| `'final'` | 결과가 확정인지 여부. partial은 아직 바뀔 수 있는 중간 결과, final은 확정된 결과 |
+| `segmentId` | `number` | 몇 번째 세그먼트(문장 단위 덩어리)인지. 세션 안에서 0부터 1씩 증가하고, 같은 세그먼트의 partial과 final은 같은 번호 |
+| `text` | `string` | 그 세그먼트의 시작부터 지금까지 인식된 전체 텍스트. 새로 추가된 단어만 보내지 않음 |
+| `startMs` | `number` | 세그먼트가 시작된 시각. 세션 시작을 0으로 한 밀리초 |
+| `endMs` | `number` | 이 이벤트 시점까지의 끝 시각. 같은 기준의 밀리초 |
+
+한 세그먼트 안에서 값이 움직이는 방식은 다음과 같습니다.
+
+- `segmentId`와 `startMs`는 바뀌지 않습니다.
+- `text`는 길어지고 `endMs`는 커집니다.
+- partial이 몇 번 온 뒤 final이 한 번 오면 그 세그먼트는 끝납니다. 다음 이벤트는 `segmentId`가 1 큰 새 세그먼트입니다.
+
+### 예시: 한 문장이 인식될 때
+
+"안녕하세요 오늘 회의를 시작하겠습니다"는 이벤트 4개로 옵니다.
+
+| 순서 | `type` | `segmentId` | `text` | `startMs` | `endMs` |
+| --- | --- | --- | --- | --- | --- |
+| 1 | partial | 0 | 안녕하세요 | 0 | 200 |
+| 2 | partial | 0 | 안녕하세요 오늘 | 0 | 400 |
+| 3 | partial | 0 | 안녕하세요 오늘 회의를 | 0 | 600 |
+| 4 | final | 0 | 안녕하세요 오늘 회의를 시작하겠습니다 | 0 | 800 |
+
+다음 문장은 `segmentId` 1, `startMs` 800으로 시작합니다. `npm run dev:stt`로 세 문장의 이벤트 14개를 직접 볼 수 있습니다.
+
+```text
+[stt] partial #0 0-200ms 안녕하세요
+[stt] partial #0 0-400ms 안녕하세요 오늘
+[stt] partial #0 0-600ms 안녕하세요 오늘 회의를
+[stt] final   #0 0-800ms 안녕하세요 오늘 회의를 시작하겠습니다
+[stt] partial #1 800-1000ms 첫
+[stt] partial #1 800-1200ms 첫 번째
+[stt] partial #1 800-1400ms 첫 번째 안건은
+[stt] partial #1 800-1600ms 첫 번째 안건은 일정
+[stt] final   #1 800-1800ms 첫 번째 안건은 일정 공유입니다
+[stt] partial #2 1800-2000ms 다음
+[stt] partial #2 1800-2200ms 다음 주까지
+[stt] partial #2 1800-2400ms 다음 주까지 초안을
+[stt] partial #2 1800-2600ms 다음 주까지 초안을 정리해
+[stt] final   #2 1800-2800ms 다음 주까지 초안을 정리해 주세요
+[stt] stopped - partial 11개, final 3개
+```
+
+### 이벤트를 쓰는 곳
+
+| 단계 | 하는 일 | 쓰는 필드 | 상태 |
+| --- | --- | --- | --- |
+| 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05, mock) |
+| 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 예정 (T07) |
+| 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
+| DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 예정 (T08, 스키마는 T03) |
+| 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | 예정 (T10, T16) |
+
+서버 코드에서 어댑터를 쓰는 방법입니다. 변수 타입을 `SttAdapter`로 두면 나중에 실제 STT로 바꿀 때 `new MockSttAdapter()` 한 곳만 바뀝니다.
+
+```ts
+import type { SttAdapter } from './stt/adapter';
+import { MockSttAdapter } from './stt/mock';
+
+const adapter: SttAdapter = new MockSttAdapter();
+
+await adapter.start((event) => {
+  // event.type, event.segmentId, event.text, event.startMs, event.endMs
+});
+
+await adapter.stop();
+```
+
+### 예시: 화면과 DB에서 일어나는 일
+
+위 예시의 이벤트가 순서대로 들어올 때 화면이 바뀌는 모습입니다. 화면은 T14에서 만들 예정이며, 아래는 이 형식이 의도한 처리 방식입니다.
+
+| 받은 이벤트 | 화면의 트랜스크립트 |
+| --- | --- |
+| partial #0 `안녕하세요` | 1번 줄: 안녕하세요 (미확정) |
+| partial #0 `안녕하세요 오늘` | 1번 줄: 안녕하세요 오늘 (미확정) |
+| partial #0 `안녕하세요 오늘 회의를` | 1번 줄: 안녕하세요 오늘 회의를 (미확정) |
+| final #0 `안녕하세요 오늘 회의를 시작하겠습니다` | 1번 줄: 안녕하세요 오늘 회의를 시작하겠습니다 (확정) |
+| partial #1 `첫` | 1번 줄은 그대로, 2번 줄: 첫 (미확정) |
+
+`text`가 누적된 전체 텍스트라서 화면은 이어 붙이는 계산 없이 줄을 통째로 바꾸면 됩니다. STT가 앞 단어를 고쳐서 다시 보내도 그대로 반영됩니다.
+
+세 문장이 모두 끝났을 때 DB에 남는 것은 final 3개입니다. partial 11개는 저장하지 않습니다.
+
+| `segmentId` | `text` | `startMs` | `endMs` |
+| --- | --- | --- | --- |
+| 0 | 안녕하세요 오늘 회의를 시작하겠습니다 | 0 | 800 |
+| 1 | 첫 번째 안건은 일정 공유입니다 | 800 | 1800 |
+| 2 | 다음 주까지 초안을 정리해 주세요 | 1800 | 2800 |
+
+### 알아 둘 점
+
+- **mock의 시각은 실제 오디오 시각이 아닙니다.** 오디오가 없어서 단어 하나당 200ms씩 더한 값입니다.
+- **mock은 문장 목록을 반복합니다.** 세 문장이 끝나면 첫 문장으로 돌아가 `stop()`을 부를 때까지 계속하고, `segmentId`는 계속 증가합니다. `npm run dev:stt`는 한 바퀴 뒤에 스스로 멈춥니다.
+- **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트를 묶는 방식은 T06에서, 나머지는 D4 협의에서 정합니다.
+- **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
+
+## 관련 문서
+
+- [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md)
+- [`docs/logs/`](logs/): 일자별 작업 기록
