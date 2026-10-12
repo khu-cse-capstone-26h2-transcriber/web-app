@@ -14,9 +14,9 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
-지침서: `docs/guides/T02.md` (아직 없음. 2단계에서 씁니다)
+지침서: `docs/guides/T02.md`
 
-2026-10-12에 저장소 상태를 확인하고 정리한 단계입니다. 구현은 다른 세션에서 진행합니다.
+2026-10-12에 저장소 상태를 확인하고 정리한 단계입니다. 2026-10-12에 구현까지 마쳤습니다.
 
 ### 착수 전 확인
 
@@ -39,21 +39,21 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### 단계
 
-- [ ] 1. Docker Desktop 실행, `docker info`로 데몬 확인
-- [ ] 2. `docs/guides/T02.md` 지침서 작성 (형식은 `T05.md`를 따름)
-- [ ] 3. 브랜치 `feat/t02-postgres-env` 생성
-- [ ] 4. 루트 `docker-compose.yml` 작성: PostgreSQL 서비스, 5432 포트, 이름 있는 볼륨, `pg_isready` healthcheck. 계정·비밀번호·DB 이름은 `.env.example`의 `DB_URL`과 맞춤
-- [ ] 5. `.env.example`의 값이 4단계와 맞는지 확인하고 필요하면 수정, `.env`로 복사 (`.env`는 커밋하지 않음)
-- [ ] 6. `apps/server/src/config/env.ts` 환경변수 로더 작성: `PORT`, `DB_URL`, `STT_URL`을 읽고, 빠진 값이 있으면 이름을 알리고 종료 코드 1로 끝냄
-- [ ] 7. `apps/server/src/index.ts`에서 로더 호출, `dev` 스크립트에 `--env-file` 연결 (실행 위치가 `apps/server`이므로 루트 `.env` 경로에 주의)
-- [ ] 8. 완료 기준 확인 후 커밋
+- [x] 1. Docker Desktop 실행, `docker info`로 데몬 확인
+- [x] 2. `docs/guides/T02.md` 지침서 작성 (형식은 `T05.md`를 따름)
+- [x] 3. 브랜치 `feat/t02-postgres-env` 생성
+- [x] 4. 루트 `docker-compose.yml` 작성: PostgreSQL 서비스, 5432 포트, 이름 있는 볼륨, `pg_isready` healthcheck. 계정·비밀번호·DB 이름은 `.env.example`의 `DB_URL`과 맞춤
+- [x] 5. `.env.example`의 값이 4단계와 맞는지 확인하고 필요하면 수정, `.env`로 복사 (`.env`는 커밋하지 않음)
+- [x] 6. `apps/server/src/config/env.ts` 환경변수 로더 작성: `PORT`, `DB_URL`, `STT_URL`을 읽고, 빠진 값이 있으면 이름을 알리고 종료 코드 1로 끝냄
+- [x] 7. `apps/server/src/index.ts`에서 로더 호출, `dev` 스크립트에 `--env-file` 연결 (실행 위치가 `apps/server`이므로 루트 `.env` 경로에 주의)
+- [x] 8. 완료 기준 확인 후 커밋
   - `docker compose up -d` 뒤 `docker compose ps`에서 `healthy`
   - 컨테이너 안에서 `psql`로 `select 1` 성공
   - `npm run typecheck` 통과
   - `npm run dev:server`가 읽은 설정으로 시작 (비밀번호는 출력하지 않음)
   - `DB_URL`을 뺀 채 실행하면 빠진 변수 이름을 알리고 종료 코드 1
   - `npm run dev:stt`가 전과 같이 동작
-- [ ] 9. 일지(`docs/logs/`), 지침서 '결과' 작성, `TODO.md` 변경안 보고
+- [x] 9. 일지(`docs/logs/`), 지침서 '결과' 작성, `TODO.md` 변경안 보고
 
 하지 않는 것: `pg` 설치와 연결 풀(T04), 테이블과 마이그레이션(T03), 서버 프레임워크 도입(D2), `STT_URL`을 실제로 쓰는 코드(T20).
 
@@ -68,14 +68,14 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### 결정하면 풀리는 작업
 
-- [ ] D2(서버 프레임워크), D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를, T02를 끝내고 D2를 정하면 T04를 시작할 수 있습니다.
+- [ ] D2(서버 프레임워크), D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를, D2를 정하면 T04를 시작할 수 있습니다. T03은 바로 시작할 수 있습니다.
 
 ## 기능별 작업
 
 ### 프로젝트 기반
 
 - [x] T01 모노레포 스캐폴딩 — P0 · 단계 1 · 선행: 없음 · 협의: 없음
-- [ ] T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더 — P0 · 단계 2 · 선행: T01 · 협의: 없음
+- [x] T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더 — P0 · 단계 2 · 선행: T01 · 협의: 없음
 - [ ] T03 DB 스키마 v0와 마이그레이션 스크립트 — P0 · 단계 3 · 선행: T02 · 협의: 없음
 - [ ] T04 서버 뼈대(HTTP 서버, `/health`, 에러 처리, pg 연결 풀) — P0 · 단계 3 · 선행: T01, T02 · 협의: 없음 · 필요한 결정: D2 서버 프레임워크
 
@@ -135,6 +135,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-12 | T02 | 완료 | 브랜치 `feat/t02-postgres-env`에서 `docker-compose.yml`(PostgreSQL 16), 환경변수 로더 `config/env.ts`, `dev` 스크립트의 `--env-file` 연결, 지침서 `T02.md` 작성. 완료 기준 9개 통과, `main`에 병합. `TODO.md` 단계에 없던 것: 서버 tsconfig에 `types: ["node"]` 추가(없으면 `process` 타입 검사 실패), 포트를 `127.0.0.1`로만 열기, compose 프로젝트 이름 고정, `PORT` 정수 확인 | push는 사용자 지시 대기 | T03 (T04는 D2, T12는 D3 결정 필요) |
 | 2026-10-12 | T02 준비 | 완료 | 커밋과 저장소 상태를 확인하고 T02 단계 9개와 착수 전 확인 4개를 `TODO.md`에 정리. 코드는 바꾸지 않음 | 착수 전 확인 4개는 사용자가 확정. Docker 데몬이 꺼져 있었음 | T02 구현(다른 세션) |
 | 2026-10-11 | 프로젝트 문서 | 완료 | `docs/project-overview.md` 작성(프로젝트 소개, 구성, STT 이벤트 필드와 사용 예시) | 예정으로 적은 부분은 해당 작업 완료 때 갱신 | T19, T02 |
 | 2026-10-11 | T05 | 완료 | 브랜치 `feat/t05-stt-adapter`에서 `SttEvent` 타입, `SttAdapter` 인터페이스, `MockSttAdapter`, `dev:stt` 추가. 완료 기준 5개 통과, `main`에 병합. 지침서와 다른 점: 워크트리 작업이라 `git switch main` 생략 | 없음 | T19(D4 협의), T02 |
