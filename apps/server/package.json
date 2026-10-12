@@ -4,9 +4,14 @@
   "type": "module",
   "scripts": {
     "dev": "tsx --env-file=../../.env src/index.ts",
-    "dev:stt": "tsx src/stt/demo.ts"
+    "dev:stt": "tsx src/stt/demo.ts",
+    "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts"
   },
   "dependencies": {
-    "@app/shared": "*"
+    "@app/shared": "*",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }
