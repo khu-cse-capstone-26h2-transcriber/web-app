@@ -42,8 +42,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | 임시 진입점만 있음 (T04, T06~T11 예정) |
-| DB | 미정 | 세션과 세그먼트를 저장합니다 | 예정 (T02, T03, T08) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | 임시 진입점이 환경변수를 읽어 확인함 (T02). HTTP 서버와 API는 예정 (T04, T06~T11) |
+| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 저장은 예정 (T03, T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent` |
 
@@ -79,11 +79,14 @@ speech-transcriber/
 ├─ TODO.md                    # 작업 목록과 작업 기록
 ├─ package.json               # npm workspaces, 공통 스크립트
 ├─ tsconfig.base.json         # 공통 컴파일러 옵션
-├─ .env.example               # PORT, DB_URL, STT_URL
+├─ .env.example               # PORT, DB_URL, STT_URL (복사해서 .env로 씀)
+├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
 ├─ apps/
 │  ├─ server/                 # @app/server — Node.js 백엔드
 │  │  └─ src/
 │  │     ├─ index.ts          # 임시 진입점
+│  │     ├─ config/
+│  │     │  └─ env.ts         # 환경변수 로더
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -102,14 +105,18 @@ speech-transcriber/
 
 ## 실행 방법
 
-Node.js 20 기준으로 개발합니다.
+Node.js 20 기준으로 개발합니다. DB는 Docker Desktop이 켜져 있어야 뜹니다.
 
 ```bash
 npm install          # 루트에서 한 번
+cp .env.example .env # 처음 한 번. .env가 없으면 dev:server가 실행되지 않음
+docker compose up -d # 로컬 PostgreSQL 실행 (끌 때는 docker compose down)
 npm run typecheck    # 모든 워크스페이스 타입 검사
-npm run dev:server   # 서버 실행 (지금은 준비 메시지만 출력)
+npm run dev:server   # 서버 실행 (지금은 읽은 설정을 출력하고 끝남)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
+
+`PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
 
 ## STT 이벤트
 
