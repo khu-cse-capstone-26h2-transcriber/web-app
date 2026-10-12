@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "tsx --env-file=../../.env src/index.ts",
     "dev:stt": "tsx src/stt/demo.ts"
   },
   "dependencies": {

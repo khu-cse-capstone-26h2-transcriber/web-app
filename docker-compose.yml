@@ -1,0 +1,24 @@
+# 로컬 개발용 PostgreSQL. 계정·비밀번호·DB 이름은 .env.example의 DB_URL과 같게 둔다.
+# 프로젝트 이름을 고정해 워크트리에서 실행해도 같은 컨테이너와 볼륨을 쓴다.
+name: speech-transcriber
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: transcriber
+    ports:
+      # 이 컴퓨터에서만 접속할 수 있게 연다.
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U user -d transcriber']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  db-data:
