@@ -43,7 +43,7 @@ flowchart LR
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | 임시 진입점이 환경변수를 읽어 확인함 (T02). HTTP 서버와 API는 예정 (T04, T06~T11) |
-| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 저장은 예정 (T03, T08). 기기에서의 구성은 미정 (D5, D8) |
+| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마 v0와 마이그레이션 있음 (T03). 저장하는 코드는 예정 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent` |
 
@@ -83,10 +83,14 @@ speech-transcriber/
 ├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
 ├─ apps/
 │  ├─ server/                 # @app/server — Node.js 백엔드
+│  │  ├─ migrations/
+│  │  │  └─ 001_init.sql      # 스키마 v0 (sessions, segments)
 │  │  └─ src/
 │  │     ├─ index.ts          # 임시 진입점
 │  │     ├─ config/
 │  │     │  └─ env.ts         # 환경변수 로더
+│  │     ├─ db/
+│  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -111,12 +115,25 @@ Node.js 20 기준으로 개발합니다. DB는 Docker Desktop이 켜져 있어�
 npm install          # 루트에서 한 번
 cp .env.example .env # 처음 한 번. .env가 없으면 dev:server가 실행되지 않음
 docker compose up -d # 로컬 PostgreSQL 실행 (끌 때는 docker compose down)
+npm run db:migrate   # 아직 적용하지 않은 마이그레이션 실행 (다시 실행해도 안전)
 npm run typecheck    # 모든 워크스페이스 타입 검사
 npm run dev:server   # 서버 실행 (지금은 읽은 설정을 출력하고 끝남)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
 
 `PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
+
+## DB 스키마
+
+스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 v0(`001_init.sql`)입니다.
+
+| 테이블 | 컬럼 | 담는 것 |
+| --- | --- | --- |
+| `sessions` | `id`, `started_at`, `ended_at` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수이고, `ended_at`이 비어 있으면 아직 녹음 중입니다 |
+| `segments` | `session_id`, `segment_id`, `text`, `start_ms`, `end_ms` | final 이벤트 하나가 한 행입니다. 기본 키는 `(session_id, segment_id)`이고, 세션을 지우면 함께 지워집니다 |
+| `schema_migrations` | `name`, `applied_at` | 적용한 마이그레이션 파일 이름. 실행 스크립트가 관리합니다 |
+
+`segments`의 컬럼은 아래 STT 이벤트 초안을 따르므로, T19 합의에서 형식이 바뀌면 마이그레이션을 추가해 맞춥니다. 세션 상태 컬럼은 T06에서 상태 전이를 정할 때 필요하면 추가합니다.
 
 ## STT 이벤트
 
@@ -178,7 +195,7 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 | 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05, mock) |
 | 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 예정 (T07) |
 | 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
-| DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 예정 (T08, 스키마는 T03) |
+| DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 예정 (T08). 테이블은 있음 (T03) |
 | 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | 예정 (T10, T16) |
 
 서버 코드에서 어댑터를 쓰는 방법입니다. 변수 타입을 `SttAdapter`로 두면 나중에 실제 STT로 바꿀 때 `new MockSttAdapter()` 한 곳만 바뀝니다.
