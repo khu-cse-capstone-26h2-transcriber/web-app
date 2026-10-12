@@ -10,37 +10,65 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-11
+마지막 갱신: 2026-10-12
 
-## 오늘의 작업 (2026-10-11) — T05 STT 어댑터 인터페이스와 mock STT
+## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
-지침서: `docs/guides/T05.md`
+지침서: `docs/guides/T02.md` (아직 없음. 2단계에서 씁니다)
 
-- [x] 1. 브랜치 `feat/t05-stt-adapter` 생성
-- [x] 2. `packages/shared/src/stt.ts`에 `SttEvent` 타입
-- [x] 3. `packages/shared/src/index.ts`에서 타입 내보내기
-- [x] 4. `apps/server/src/stt/adapter.ts`에 `SttAdapter` 인터페이스
-- [x] 5. `apps/server/src/stt/mock.ts`에 `MockSttAdapter`
-- [x] 6. `apps/server/src/stt/demo.ts` 확인용 스크립트
-- [x] 7. 루트와 서버 `package.json`에 `dev:stt` 스크립트 추가
-- [x] 8. `npm run typecheck`, `npm run dev:stt`, `npm run dev:server` 확인, 커밋
-- [x] 9. 일지, 지침서 '결과', `TODO.md` 기록
+2026-10-12에 저장소 상태를 확인하고 정리한 단계입니다. 구현은 다른 세션에서 진행합니다.
 
-## 내일 할 작업 (2026-10-12)
+### 착수 전 확인
 
-2026-10-11 작업을 마치며 정리한 목록입니다. 다음 세션은 이 목록부터 확인합니다.
+아래 네 가지는 사용자가 2026-10-12에 확정했습니다. 다시 묻지 않고 이대로 진행합니다.
 
-### 꼭 할 일
+| 항목 | 결정 | 비고 |
+| --- | --- | --- |
+| 브랜치 이름 | `feat/t02-postgres-env` | T05와 같은 형식 |
+| PostgreSQL 버전 | 16 (`postgres:16` 이미지) | Rubik Pi에서 쓸 버전(D5)이 정해지면 맞춥니다 |
+| `.env` 읽는 방법 | Node 20 내장 `--env-file` | 패키지를 추가하지 않습니다. 파일이 없으면 실행이 실패하므로 `.env`를 먼저 만듭니다 |
+| `pg` 설치 시점 | T02에서는 설치하지 않음 | 실제 DB 연결과 연결 풀은 T04 범위입니다 |
 
-- [ ] **D4 협의 요청** (사용자가 직접) — 박지윤(AI), 김범수(하드웨어)에게 STT 연동 방식 협의를 요청합니다. T05가 끝나 D4의 '늦어도 필요한 시점'이 됐고, T19와 T20이 이 합의에 막혀 있습니다.
+### 확인한 저장소 상태
+
+- `.env.example`은 T01에서 이미 만들었습니다. 변수는 `PORT`, `DB_URL`, `STT_URL`입니다. 새 이름을 만들지 않고 이 이름을 그대로 씁니다.
+- `.gitignore`에 `.env`, `.env.*`, `!.env.example`이 이미 있습니다. 고칠 것이 없습니다.
+- Docker 29.2.0과 Docker Compose v5.0.2가 설치되어 있지만, 확인 시점에 Docker 데몬이 꺼져 있었습니다. Docker Desktop을 먼저 켜야 합니다.
+- 5432 포트를 쓰는 프로세스는 없었습니다.
+- Node는 v20.20.2입니다.
+
+### 단계
+
+- [ ] 1. Docker Desktop 실행, `docker info`로 데몬 확인
+- [ ] 2. `docs/guides/T02.md` 지침서 작성 (형식은 `T05.md`를 따름)
+- [ ] 3. 브랜치 `feat/t02-postgres-env` 생성
+- [ ] 4. 루트 `docker-compose.yml` 작성: PostgreSQL 서비스, 5432 포트, 이름 있는 볼륨, `pg_isready` healthcheck. 계정·비밀번호·DB 이름은 `.env.example`의 `DB_URL`과 맞춤
+- [ ] 5. `.env.example`의 값이 4단계와 맞는지 확인하고 필요하면 수정, `.env`로 복사 (`.env`는 커밋하지 않음)
+- [ ] 6. `apps/server/src/config/env.ts` 환경변수 로더 작성: `PORT`, `DB_URL`, `STT_URL`을 읽고, 빠진 값이 있으면 이름을 알리고 종료 코드 1로 끝냄
+- [ ] 7. `apps/server/src/index.ts`에서 로더 호출, `dev` 스크립트에 `--env-file` 연결 (실행 위치가 `apps/server`이므로 루트 `.env` 경로에 주의)
+- [ ] 8. 완료 기준 확인 후 커밋
+  - `docker compose up -d` 뒤 `docker compose ps`에서 `healthy`
+  - 컨테이너 안에서 `psql`로 `select 1` 성공
+  - `npm run typecheck` 통과
+  - `npm run dev:server`가 읽은 설정으로 시작 (비밀번호는 출력하지 않음)
+  - `DB_URL`을 뺀 채 실행하면 빠진 변수 이름을 알리고 종료 코드 1
+  - `npm run dev:stt`가 전과 같이 동작
+- [ ] 9. 일지(`docs/logs/`), 지침서 '결과' 작성, `TODO.md` 변경안 보고
+
+하지 않는 것: `pg` 설치와 연결 풀(T04), 테이블과 마이그레이션(T03), 서버 프레임워크 도입(D2), `STT_URL`을 실제로 쓰는 코드(T20).
+
+## 함께 확인할 것
+
+### 사용자가 직접 할 일
+
+- [ ] **D4 협의 요청** — 박지윤(AI), 김범수(하드웨어)에게 STT 연동 방식 협의를 요청합니다. T05가 끝나 D4의 '늦어도 필요한 시점'이 됐고, T19와 T20이 이 합의에 막혀 있습니다.
   - 들고 갈 초안: `docs/project-overview.md`의 'STT 이벤트' 절
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
-- [ ] **T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더** — 결정 없이 바로 시작할 수 있는 다음 P0 작업이고, T03과 T04가 여기에 막혀 있습니다. 지침서 `docs/guides/T02.md`부터 씁니다. 노트북에 Docker 29.2.0과 Docker Compose v5.0.2가 설치되어 있습니다.
+- [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 
-### 확인할 것
+### 결정하면 풀리는 작업
 
 - [ ] D2(서버 프레임워크), D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를, T02를 끝내고 D2를 정하면 T04를 시작할 수 있습니다.
-- [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 
 ## 기능별 작업
 
@@ -107,6 +135,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-12 | T02 준비 | 완료 | 커밋과 저장소 상태를 확인하고 T02 단계 9개와 착수 전 확인 4개를 `TODO.md`에 정리. 코드는 바꾸지 않음 | 착수 전 확인 4개는 사용자가 확정. Docker 데몬이 꺼져 있었음 | T02 구현(다른 세션) |
 | 2026-10-11 | 프로젝트 문서 | 완료 | `docs/project-overview.md` 작성(프로젝트 소개, 구성, STT 이벤트 필드와 사용 예시) | 예정으로 적은 부분은 해당 작업 완료 때 갱신 | T19, T02 |
 | 2026-10-11 | T05 | 완료 | 브랜치 `feat/t05-stt-adapter`에서 `SttEvent` 타입, `SttAdapter` 인터페이스, `MockSttAdapter`, `dev:stt` 추가. 완료 기준 5개 통과, `main`에 병합. 지침서와 다른 점: 워크트리 작업이라 `git switch main` 생략 | 없음 | T19(D4 협의), T02 |
 | 2026-10-11 | T05 지침서 | 완료 | `docs/guides/T05.md` 작성, 코드 사전 검증, `main`에 병합 | 없음 | T05 구현 |
