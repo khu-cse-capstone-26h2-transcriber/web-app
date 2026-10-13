@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-10-12 · 이광호
+마지막 갱신: 2026-10-13 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -42,7 +42,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | 임시 진입점이 환경변수를 읽어 확인함 (T02). HTTP 서버와 API는 예정 (T04, T06~T11) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션·SSE·히스토리 API는 예정 (T06~T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마 v0와 마이그레이션 있음 (T03). 저장하는 코드는 예정 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent` |
@@ -86,11 +86,15 @@ speech-transcriber/
 │  │  ├─ migrations/
 │  │  │  └─ 001_init.sql      # 스키마 v0 (sessions, segments)
 │  │  └─ src/
-│  │     ├─ index.ts          # 임시 진입점
+│  │     ├─ index.ts          # 진입점 (listen, 종료 처리)
+│  │     ├─ app.ts            # Express 앱 조립 (/health, 404·에러 처리)
 │  │     ├─ config/
 │  │     │  └─ env.ts         # 환경변수 로더
 │  │     ├─ db/
+│  │     │  ├─ pool.ts        # pg 연결 풀
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
+│  │     ├─ http/
+│  │     │  └─ errors.ts      # HttpError, 404·에러 처리 미들웨어
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -117,9 +121,11 @@ cp .env.example .env # 처음 한 번. .env가 없으면 dev:server가 실행되
 docker compose up -d # 로컬 PostgreSQL 실행 (끌 때는 docker compose down)
 npm run db:migrate   # 아직 적용하지 않은 마이그레이션 실행 (다시 실행해도 안전)
 npm run typecheck    # 모든 워크스페이스 타입 검사
-npm run dev:server   # 서버 실행 (지금은 읽은 설정을 출력하고 끝남)
+npm run dev:server   # 서버 실행 (끌 때는 Ctrl+C)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
+
+`dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다.
 
 `PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
 
