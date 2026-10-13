@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-12
+마지막 갱신: 2026-10-13
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -68,7 +68,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### 결정하면 풀리는 작업
 
-- [ ] D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를 시작할 수 있습니다. D2는 Express로 확정되어 T04를 바로 시작할 수 있습니다.
+- [ ] D3(웹앱 빌드 도구) 결정 — D3을 정하면 T12를 시작할 수 있습니다.
 
 ## 기능별 작업
 
@@ -77,7 +77,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - [x] T01 모노레포 스캐폴딩 — P0 · 단계 1 · 선행: 없음 · 협의: 없음
 - [x] T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더 — P0 · 단계 2 · 선행: T01 · 협의: 없음
 - [x] T03 DB 스키마 v0와 마이그레이션 스크립트 — P0 · 단계 3 · 선행: T02 · 협의: 없음
-- [ ] T04 서버 뼈대(HTTP 서버, `/health`, 에러 처리, pg 연결 풀) — P0 · 단계 3 · 선행: T01, T02 · 협의: 없음 · 서버 프레임워크: Express(D2 확정)
+- [x] T04 서버 뼈대(HTTP 서버, `/health`, 에러 처리, pg 연결 풀) — P0 · 단계 3 · 선행: T01, T02 · 협의: 없음 · 서버 프레임워크: Express(D2 확정)
 
 ### STT 연동
 
@@ -135,6 +135,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-13 | T04 | 완료 | 브랜치 `feat/t04-server-skeleton`에서 `express` 5.3.0·`@types/express` 5.0.6 설치, pg 연결 풀 `db/pool.ts`, 에러 형식과 미들웨어 `http/errors.ts`, 앱 조립 `app.ts`, 진입점 `index.ts` 교체(listen, 종료 처리). 완료 기준 13개 통과. 사전 검증에서 보류됐던 DB 켜진 상태의 `/health` 200과 DB 재시작 뒤 회복을 확인. 지침서와 다른 점: Ctrl+C 대신 같은 프로세스들에 `SIGINT`를 보내 확인. `main`에 병합하고 push | DB를 켠 직후 첫 `/health`는 503, 준비되면 200. 서버 listen 주소(D5)와 CORS(T12)는 미정 | T06 (T12는 D3 결정 필요) |
 | 2026-10-13 | 저장소 이전 | 완료 | 팀이 organization에서 함께 정리하기로 해 개인 저장소의 작업을 `khu-cse-capstone-26h2-transcriber/web-app`(private)으로 옮김. `main` 커밋 27개 push, `origin` 변경, 개인 저장소 `gwangholee507/speech-transcriber-app`은 archive. 처음 정한 Public은 히스토리 점검(옛 `CLAUDE.md`, 작성자 이메일) 뒤 Private으로 바꿈(사용자 결정) | 공개 전환 여부 미정. `v33jy`는 read 권한이라 push 불가 | T04 |
 | 2026-10-12 | D2 확정 | 완료 | 서버 프레임워크를 Express로 확정(사용자가 익숙함). `CLAUDE.md`와 `docs/project-overview.md`에 반영. 팀 공유용 문서 작성, D4 협의 질문 목록 `docs/d4-stt-questions.md` 작성. `main`에 병합하고 push | 진행 보드는 10-10 이후 갱신되지 않아 D2가 Fastify 제안으로 남아 있음 | T04 |
 | 2026-10-12 | T03 | 완료 | 브랜치 `feat/t03-db-schema`에서 `pg`·`@types/pg` 설치, 스키마 v0(`001_init.sql`: `sessions`, `segments`), 마이그레이션 실행 스크립트 `db/migrate.ts`, `db:migrate` 명령어, 지침서 `T03.md` 작성. 완료 기준 10개 통과, `main`에 병합하고 push. `CLAUDE.md`의 개발 명령어에 `npm run db:migrate` 추가. 바뀐 결정: `pg` 설치를 T04에서 T03으로 앞당김(사용자 확정) | D4 합의에서 이벤트 형식이 바뀌면 `segments`를 고치는 마이그레이션 필요 | D2를 정하면 T04, D3을 정하면 T12 |
