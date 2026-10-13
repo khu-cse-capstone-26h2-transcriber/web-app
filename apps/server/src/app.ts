@@ -2,8 +2,10 @@
 import express, { type Express } from 'express';
 import type { Pool } from 'pg';
 import { errorHandler, HttpError, notFoundHandler } from './http/errors';
+import type { SessionManager } from './sessions/manager';
+import { createSessionRouter } from './sessions/routes';
 
-export function createApp(pool: Pool): Express {
+export function createApp(pool: Pool, sessions: SessionManager): Express {
   const app = express();
   app.use(express.json());
 
@@ -16,6 +18,9 @@ export function createApp(pool: Pool): Express {
     }
     res.json({ status: 'ok' });
   });
+
+  // API는 모두 /api 아래에 둔다.
+  app.use('/api/sessions', createSessionRouter(sessions));
 
   // 라우트 뒤에 둔다. 순서가 바뀌면 모든 요청이 404가 된다.
   app.use(notFoundHandler);
