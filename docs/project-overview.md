@@ -42,10 +42,10 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션·SSE·히스토리 API는 예정 (T06~T11) |
-| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마 v0와 마이그레이션 있음 (T03). 저장하는 코드는 예정 (T08). 기기에서의 구성은 미정 (D5, D8) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). SSE·세그먼트 저장·히스토리 API는 예정 (T07~T11) |
+| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트를 저장하는 코드는 예정 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
-| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent` |
+| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session` |
 
 ## 기술 결정
 
@@ -84,10 +84,11 @@ speech-transcriber/
 ├─ apps/
 │  ├─ server/                 # @app/server — Node.js 백엔드
 │  │  ├─ migrations/
-│  │  │  └─ 001_init.sql      # 스키마 v0 (sessions, segments)
+│  │  │  ├─ 001_init.sql      # 스키마 v0 (sessions, segments)
+│  │  │  └─ 002_session_status.sql  # sessions.status 컬럼
 │  │  └─ src/
-│  │     ├─ index.ts          # 진입점 (listen, 종료 처리)
-│  │     ├─ app.ts            # Express 앱 조립 (/health, 404·에러 처리)
+│  │     ├─ index.ts          # 진입점 (listen, 남은 세션 정리, 종료 처리)
+│  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, 404·에러 처리)
 │  │     ├─ config/
 │  │     │  └─ env.ts         # 환경변수 로더
 │  │     ├─ db/
@@ -95,6 +96,10 @@ speech-transcriber/
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
 │  │     ├─ http/
 │  │     │  └─ errors.ts      # HttpError, 404·에러 처리 미들웨어
+│  │     ├─ sessions/
+│  │     │  ├─ repository.ts  # sessions 테이블 SQL
+│  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결
+│  │     │  └─ routes.ts      # 세션 API 라우트
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -104,6 +109,7 @@ speech-transcriber/
 │  └─ shared/                 # @app/shared — 서버·웹 공용 타입과 상수
 │     └─ src/
 │        ├─ index.ts
+│        ├─ session.ts        # Session 타입
 │        └─ stt.ts            # SttEvent 타입
 └─ docs/
    ├─ project-overview.md     # 이 문서
@@ -129,17 +135,43 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 
 `PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
 
+## 세션 API
+
+녹음 세션을 시작하고 끝내는 API입니다(T06). 단일 사용자라 진행 중인 세션은 한 번에 하나뿐입니다. 성공 응답은 `{ "session": … }`으로 감싸고, 에러는 `{ "error": { "code", "message" } }`로 응답합니다.
+
+| 요청 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `POST /api/sessions` | 세션을 만들고 STT를 켭니다 | `201`과 세션. 진행 중인 세션이 있으면 `409` `SESSION_ALREADY_ACTIVE` |
+| `GET /api/sessions/active` | 진행 중인 세션을 알려 줍니다 | `200`과 세션. 없으면 `{"session":null}` |
+| `POST /api/sessions/:id/stop` | STT를 끄고 세션을 닫습니다 | `200`과 세션. 없는 번호면 `404` `SESSION_NOT_FOUND`, 진행 중이 아니면 `409` `SESSION_NOT_ACTIVE`, 번호가 양의 정수가 아니면 `400` `INVALID_SESSION_ID` |
+
+세션은 `{"id":1,"status":"recording","startedAt":"2026-10-13T01:29:37.747Z","endedAt":null}` 모양이고, 타입은 `packages/shared/src/session.ts`의 `Session`입니다.
+
+| `status` | 뜻 |
+| --- | --- |
+| `recording` | 녹음 중. `endedAt`이 `null`입니다 |
+| `ended` | 사용자가 종료했습니다 |
+| `interrupted` | 사용자가 종료하지 않았는데 끊겼습니다. 녹음 중에 서버를 끄면 이 상태로 닫히고, 서버가 강제로 꺼져 닫지 못한 세션은 서버를 다시 켤 때 이 상태로 닫힙니다 |
+
+```bash
+curl -X POST localhost:3000/api/sessions          # 시작
+curl localhost:3000/api/sessions/active           # 진행 중인 세션
+curl -X POST localhost:3000/api/sessions/1/stop   # 종료 (1은 시작할 때 받은 id)
+```
+
+물리 버튼으로 녹음을 시작하는 경로와, 정지한 뒤 마지막 final을 기다리는 단계는 D4 협의에서 정해지면 추가합니다.
+
 ## DB 스키마
 
-스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 v0(`001_init.sql`)입니다.
+스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 `002_session_status.sql`까지 있습니다.
 
 | 테이블 | 컬럼 | 담는 것 |
 | --- | --- | --- |
-| `sessions` | `id`, `started_at`, `ended_at` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수이고, `ended_at`이 비어 있으면 아직 녹음 중입니다 |
+| `sessions` | `id`, `started_at`, `ended_at`, `status` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수입니다. `status`는 `recording`, `ended`, `interrupted` 중 하나이고, `recording`인 행만 `ended_at`이 비어 있습니다 |
 | `segments` | `session_id`, `segment_id`, `text`, `start_ms`, `end_ms` | final 이벤트 하나가 한 행입니다. 기본 키는 `(session_id, segment_id)`이고, 세션을 지우면 함께 지워집니다 |
 | `schema_migrations` | `name`, `applied_at` | 적용한 마이그레이션 파일 이름. 실행 스크립트가 관리합니다 |
 
-`segments`의 컬럼은 아래 STT 이벤트 초안을 따르므로, T19 합의에서 형식이 바뀌면 마이그레이션을 추가해 맞춥니다. 세션 상태 컬럼은 T06에서 상태 전이를 정할 때 필요하면 추가합니다.
+`segments`의 컬럼은 아래 STT 이벤트 초안을 따르므로, T19 합의에서 형식이 바뀌면 마이그레이션을 추가해 맞춥니다.
 
 ## STT 이벤트
 
@@ -245,12 +277,12 @@ await adapter.stop();
 
 - **mock의 시각은 실제 오디오 시각이 아닙니다.** 오디오가 없어서 단어 하나당 200ms씩 더한 값입니다.
 - **mock은 문장 목록을 반복합니다.** 세 문장이 끝나면 첫 문장으로 돌아가 `stop()`을 부를 때까지 계속하고, `segmentId`는 계속 증가합니다. `npm run dev:stt`는 한 바퀴 뒤에 스스로 멈춥니다.
-- **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트를 묶는 방식은 T06에서, 나머지는 D4 협의에서 정합니다.
+- **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트는 서버가 묶습니다(T06). 서버가 세션마다 어댑터를 새로 만들고, 그 어댑터가 준 이벤트를 그 세션의 것으로 봅니다. 나머지는 D4 협의에서 정합니다.
 - **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
 
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
