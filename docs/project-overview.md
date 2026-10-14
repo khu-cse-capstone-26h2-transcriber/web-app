@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-10-13 · 이광호
+마지막 갱신: 2026-10-14 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -42,8 +42,8 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). SSE·세그먼트 저장·히스토리 API는 예정 (T07~T11) |
-| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트를 저장하는 코드는 예정 (T08). 기기에서의 구성은 미정 (D5, D8) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). SSE와 히스토리 API는 예정 (T07, T09~T11) |
+| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session` |
 
@@ -96,9 +96,12 @@ speech-transcriber/
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
 │  │     ├─ http/
 │  │     │  └─ errors.ts      # HttpError, 404·에러 처리 미들웨어
+│  │     ├─ segments/
+│  │     │  ├─ repository.ts  # segments 테이블에 쓰는 SQL
+│  │     │  └─ writer.ts      # 세션의 final을 순서대로 쓰고, 실패하면 다시 시도
 │  │     ├─ sessions/
 │  │     │  ├─ repository.ts  # sessions 테이블 SQL
-│  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결
+│  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결, 세그먼트 저장 연결
 │  │     │  └─ routes.ts      # 세션 API 라우트
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
@@ -168,10 +171,18 @@ curl -X POST localhost:3000/api/sessions/1/stop   # 종료 (1은 시작할 때 �
 | 테이블 | 컬럼 | 담는 것 |
 | --- | --- | --- |
 | `sessions` | `id`, `started_at`, `ended_at`, `status` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수입니다. `status`는 `recording`, `ended`, `interrupted` 중 하나이고, `recording`인 행만 `ended_at`이 비어 있습니다 |
-| `segments` | `session_id`, `segment_id`, `text`, `start_ms`, `end_ms` | final 이벤트 하나가 한 행입니다. 기본 키는 `(session_id, segment_id)`이고, 세션을 지우면 함께 지워집니다 |
+| `segments` | `session_id`, `segment_id`, `text`, `start_ms`, `end_ms` | final 이벤트 하나가 한 행입니다. 기본 키는 `(session_id, segment_id)`이고, 세션을 지우면 함께 지워집니다. 같은 키의 final이 다시 오면 나중 값으로 덮어씁니다 |
 | `schema_migrations` | `name`, `applied_at` | 적용한 마이그레이션 파일 이름. 실행 스크립트가 관리합니다 |
 
 `segments`의 컬럼은 아래 STT 이벤트 초안을 따르므로, T19 합의에서 형식이 바뀌면 마이그레이션을 추가해 맞춥니다.
+
+세그먼트는 녹음 중에 final이 올 때마다 바로 한 행씩 들어갑니다(T08). 저장한 내용은 아래로 확인합니다. `1`은 세션 번호입니다.
+
+```bash
+docker compose exec db psql -U user -d transcriber -c 'select segment_id, text, start_ms, end_ms from segments where session_id = 1 order by segment_id'
+```
+
+녹음 중에 DB에 닿지 못하면 그동안의 final은 서버 메모리에 쌓였다가, DB가 돌아온 뒤 다음 final이 올 때나 종료할 때 순서대로 저장됩니다. 종료할 때도 쓰지 못하면 `POST /api/sessions/:id/stop`이 500을 내고 세션은 녹음 중으로 남으며, DB가 돌아온 뒤 다시 종료하면 저장됩니다. 서버를 끌 때까지 쓰지 못한 세그먼트는 잃습니다.
 
 ## STT 이벤트
 
@@ -233,7 +244,7 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 | 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05, mock) |
 | 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 예정 (T07) |
 | 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
-| DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 예정 (T08). 테이블은 있음 (T03) |
+| DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 구현됨 (T08) |
 | 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | 예정 (T10, T16) |
 
 서버 코드에서 어댑터를 쓰는 방법입니다. 변수 타입을 `SttAdapter`로 두면 나중에 실제 STT로 바꿀 때 `new MockSttAdapter()` 한 곳만 바뀝니다.
@@ -278,11 +289,12 @@ await adapter.stop();
 - **mock의 시각은 실제 오디오 시각이 아닙니다.** 오디오가 없어서 단어 하나당 200ms씩 더한 값입니다.
 - **mock은 문장 목록을 반복합니다.** 세 문장이 끝나면 첫 문장으로 돌아가 `stop()`을 부를 때까지 계속하고, `segmentId`는 계속 증가합니다. `npm run dev:stt`는 한 바퀴 뒤에 스스로 멈춥니다.
 - **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트는 서버가 묶습니다(T06). 서버가 세션마다 어댑터를 새로 만들고, 그 어댑터가 준 이벤트를 그 세션의 것으로 봅니다. 나머지는 D4 협의에서 정합니다.
+- **final이 오지 않은 세그먼트는 저장되지 않습니다.** 문장 중간에 녹음을 종료하면 그 문장은 DB에 없습니다. 실제 STT가 정지할 때 마지막 final을 내주는지는 D4 협의에서 정합니다.
 - **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
 
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), 세그먼트 저장은 [`T08.md`](guides/T08.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
