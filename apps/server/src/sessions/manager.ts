@@ -2,6 +2,7 @@
 import type { Session, SttEvent } from '@app/shared';
 import type { Pool } from 'pg';
 import { HttpError } from '../http/errors';
+import { SegmentWriter } from '../segments/writer';
 import type { SttAdapter } from '../stt/adapter';
 import { closeSession, findSession, insertSession, interruptOpenSessions } from './repository';
 
@@ -12,6 +13,8 @@ interface ActiveSession {
   session: Session;
   adapter: SttAdapter;
   adapterStopped: boolean;
+  // 이 세션의 final 세그먼트를 DB에 쓴다.
+  writer: SegmentWriter;
   partialCount: number;
   finalCount: number;
 }
@@ -56,6 +59,7 @@ export class SessionManager {
         session,
         adapter: this.createAdapter(),
         adapterStopped: false,
+        writer: new SegmentWriter(this.pool, session.id),
         partialCount: 0,
         finalCount: 0,
       };
@@ -97,6 +101,8 @@ export class SessionManager {
         await active.adapter.stop();
         active.adapterStopped = true;
       }
+      // 밀린 세그먼트를 모두 쓴 뒤에 세션을 닫는다. 쓰지 못하면 세션은 녹음 중으로 남는다.
+      await active.writer.flush();
       closed = await closeSession(this.pool, id, 'ended');
     } catch (error) {
       // 종료에 실패하면 녹음 중으로 되돌려, 종료를 다시 요청할 수 있게 한다.
@@ -111,7 +117,7 @@ export class SessionManager {
       throw new HttpError(409, 'SESSION_NOT_ACTIVE', `진행 중인 세션이 아닙니다: ${id}`);
     }
     console.log(
-      `[session] #${id} 종료 - partial ${active.partialCount}개, final ${active.finalCount}개`,
+      `[session] #${id} 종료 - partial ${active.partialCount}개, final ${active.finalCount}개, 저장 ${active.writer.savedCount}개`,
     );
     return closed;
   }
@@ -124,17 +130,27 @@ export class SessionManager {
     this.active = undefined;
     this.state = 'idle';
     if (!active.adapterStopped) await active.adapter.stop();
+    // 밀린 세그먼트를 마지막으로 써 본다. 서버가 꺼지는 중이라 실패하면 더 기다리지 않는다.
+    try {
+      await active.writer.flush();
+    } catch {
+      console.error(
+        `[segment] #${active.session.id} 저장하지 못한 세그먼트 ${active.writer.pendingCount}개를 잃었습니다`,
+      );
+    }
     await closeSession(this.pool, active.session.id, 'interrupted');
     console.log(
-      `[session] #${active.session.id} 중단 (서버 종료) - partial ${active.partialCount}개, final ${active.finalCount}개`,
+      `[session] #${active.session.id} 중단 (서버 종료) - partial ${active.partialCount}개, final ${active.finalCount}개, 저장 ${active.writer.savedCount}개`,
     );
   }
 
   // 어댑터가 준 이벤트는 이 세션의 것이다. 이벤트에는 세션 번호가 없고, 서버가 여기서 묶는다.
-  // T07(SSE)과 T08(DB 저장)이 이 자리에서 이벤트를 받아 간다. 지금은 개수만 센다.
+  // T07(SSE)이 이 자리에서 이벤트를 받아 간다.
   private handleEvent(active: ActiveSession, event: SttEvent): void {
     if (event.type === 'final') {
       active.finalCount += 1;
+      // final만 DB에 저장한다. partial은 저장하지 않는다.
+      active.writer.enqueue(event);
     } else {
       active.partialCount += 1;
     }
