@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-10-14 · 이광호
+마지막 갱신: 2026-10-15 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -42,10 +42,10 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). SSE와 히스토리 API는 예정 (T07, T09~T11) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). SSE 재연결 이어받기와 히스토리 API는 예정 (T09~T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
-| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session` |
+| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS` |
 
 ## 기술 결정
 
@@ -95,14 +95,15 @@ speech-transcriber/
 │  │     │  ├─ pool.ts        # pg 연결 풀
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
 │  │     ├─ http/
-│  │     │  └─ errors.ts      # HttpError, 404·에러 처리 미들웨어
+│  │     │  ├─ errors.ts      # HttpError, 404·에러 처리 미들웨어
+│  │     │  └─ sse.ts         # SSE 응답 하나 (헤더, data 한 줄 JSON, heartbeat)
 │  │     ├─ segments/
 │  │     │  ├─ repository.ts  # segments 테이블에 쓰는 SQL
 │  │     │  └─ writer.ts      # 세션의 final을 순서대로 쓰고, 실패하면 다시 시도
 │  │     ├─ sessions/
 │  │     │  ├─ repository.ts  # sessions 테이블 SQL
-│  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결, 세그먼트 저장 연결
-│  │     │  └─ routes.ts      # 세션 API 라우트
+│  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결, 세그먼트 저장 연결, 스트림 구독
+│  │     │  └─ routes.ts      # 세션 API와 스트림 라우트
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -113,6 +114,7 @@ speech-transcriber/
 │     └─ src/
 │        ├─ index.ts
 │        ├─ session.ts        # Session 타입
+│        ├─ stream.ts         # SessionStreamMessage 타입, heartbeat 간격
 │        └─ stt.ts            # SttEvent 타입
 └─ docs/
    ├─ project-overview.md     # 이 문서
@@ -163,6 +165,57 @@ curl -X POST localhost:3000/api/sessions/1/stop   # 종료 (1은 시작할 때 �
 ```
 
 물리 버튼으로 녹음을 시작하는 경로와, 정지한 뒤 마지막 final을 기다리는 단계는 D4 협의에서 정해지면 추가합니다.
+
+## 실시간 스트림 (SSE)
+
+녹음 중인 세션의 STT 이벤트를 웹앱에 실시간으로 보내는 엔드포인트입니다(T07).
+
+| 요청 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `GET /api/sessions/:id/events` | 진행 중인 세션의 이벤트를 SSE로 보냅니다 | `200`과 `text/event-stream`. 없는 번호면 `404` `SESSION_NOT_FOUND`, 진행 중이 아니면 `409` `SESSION_NOT_ACTIVE`, 번호가 양의 정수가 아니면 `400` `INVALID_SESSION_ID` (세션 API와 같은 에러 JSON) |
+
+메시지는 모두 SSE의 기본 `message` 이벤트로 오고, `data` 한 줄에 JSON 하나입니다. 종류는 JSON의 `type`으로 구분하고, 타입은 `packages/shared/src/stream.ts`의 `SessionStreamMessage`입니다. 나중에 WebSocket으로 바꿔도 같은 JSON을 보냅니다.
+
+| `type` | 언제 | 내용 |
+| --- | --- | --- |
+| `partial`, `final` | STT가 이벤트를 낼 때마다 | `SttEvent` 그대로 (아래 'STT 이벤트' 참고) |
+| `heartbeat` | 접속한 뒤 15초마다 (`STREAM_HEARTBEAT_MS`) | 없음. 연결이 살아 있다는 표시입니다 |
+| `ended` | 세션 종료가 성공했을 때 | `session`: 닫힌 세션. 이 메시지 뒤에 서버가 스트림을 닫습니다 |
+
+```text
+data: {"type":"partial","segmentId":0,"text":"안녕하세요","startMs":0,"endMs":200}
+
+data: {"type":"final","segmentId":0,"text":"안녕하세요 오늘 회의를 시작하겠습니다","startMs":0,"endMs":800}
+
+data: {"type":"heartbeat"}
+
+data: {"type":"ended","session":{"id":17,"status":"ended","startedAt":"2026-10-15T02:13:00.575Z","endedAt":"2026-10-15T02:13:06.625Z"}}
+```
+
+```bash
+curl -X POST localhost:3000/api/sessions        # 시작. 응답의 id를 아래에 씀
+curl -N localhost:3000/api/sessions/1/events    # 스트림 (-N은 받는 대로 출력)
+```
+
+브라우저에서는 `EventSource`로 받습니다.
+
+```ts
+import type { SessionStreamMessage } from '@app/shared';
+
+const source = new EventSource(`/api/sessions/${id}/events`);
+source.onmessage = (event) => {
+  const message: SessionStreamMessage = JSON.parse(event.data);
+  if (message.type === 'ended') source.close();
+  // partial, final은 'STT 이벤트'의 화면 처리대로 그린다. heartbeat는 무시해도 된다.
+};
+```
+
+- **접속한 뒤의 이벤트만 옵니다.** 녹음 도중에 접속하거나 새로고침하면 그 전 문장은 오지 않습니다. 재접속 때 빠진 이벤트를 채우는 것은 T09, 지난 세션은 히스토리 API(T10)입니다.
+- **여러 곳에서 동시에 접속할 수 있고**, 모두 같은 이벤트를 받습니다.
+- **종료가 실패하면**(예: DB가 꺼짐) 스트림은 닫히지 않고 heartbeat만 옵니다. 다시 종료해 성공하면 `ended`가 옵니다.
+- **서버를 끄면** `ended` 없이 스트림이 끊깁니다. 세션은 `interrupted`로 닫힙니다.
+- **`EventSource`는 끊기면 스스로 다시 접속합니다.** 끝난 세션에 다시 접속하면 `409`를 받고 멈춥니다. 끊김 표시(상단 배너)와 재연결 정책은 T15입니다.
+- **CORS는 아직 없습니다.** 웹앱을 다른 포트에서 띄울 때의 처리는 T12에서 정합니다.
 
 ## DB 스키마
 
@@ -242,7 +295,7 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 | 단계 | 하는 일 | 쓰는 필드 | 상태 |
 | --- | --- | --- | --- |
 | 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05, mock) |
-| 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 예정 (T07) |
+| 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 구현됨 (T07) |
 | 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
 | DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 구현됨 (T08) |
 | 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | 예정 (T10, T16) |
@@ -295,6 +348,6 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), 세그먼트 저장은 [`T08.md`](guides/T08.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
