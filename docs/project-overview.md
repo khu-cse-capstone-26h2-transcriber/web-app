@@ -42,10 +42,10 @@ flowchart LR
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). SSE 재연결 이어받기와 히스토리 API는 예정 (T09~T11) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). SSE 재연결 이어받기와 내보내기는 예정 (T09, T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
-| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS` |
+| 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS` |
 
 ## 기술 결정
 
@@ -98,12 +98,12 @@ speech-transcriber/
 │  │     │  ├─ errors.ts      # HttpError, 404·에러 처리 미들웨어
 │  │     │  └─ sse.ts         # SSE 응답 하나 (헤더, data 한 줄 JSON, heartbeat)
 │  │     ├─ segments/
-│  │     │  ├─ repository.ts  # segments 테이블에 쓰는 SQL
+│  │     │  ├─ repository.ts  # segments 테이블을 읽고 쓰는 SQL
 │  │     │  └─ writer.ts      # 세션의 final을 순서대로 쓰고, 실패하면 다시 시도
 │  │     ├─ sessions/
-│  │     │  ├─ repository.ts  # sessions 테이블 SQL
+│  │     │  ├─ repository.ts  # sessions 테이블 SQL (히스토리 목록 포함)
 │  │     │  ├─ manager.ts     # 진행 중인 세션, 상태 전이, STT 어댑터 연결, 세그먼트 저장 연결, 스트림 구독
-│  │     │  └─ routes.ts      # 세션 API와 스트림 라우트
+│  │     │  └─ routes.ts      # 세션 API, 스트림, 히스토리 라우트
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
@@ -113,7 +113,8 @@ speech-transcriber/
 │  └─ shared/                 # @app/shared — 서버·웹 공용 타입과 상수
 │     └─ src/
 │        ├─ index.ts
-│        ├─ session.ts        # Session 타입
+│        ├─ segment.ts        # Segment 타입 (저장된 세그먼트)
+│        ├─ session.ts        # Session, SessionSummary 타입
 │        ├─ stream.ts         # SessionStreamMessage 타입, heartbeat 간격
 │        └─ stt.ts            # SttEvent 타입
 └─ docs/
@@ -217,6 +218,36 @@ source.onmessage = (event) => {
 - **`EventSource`는 끊기면 스스로 다시 접속합니다.** 끝난 세션에 다시 접속하면 `409`를 받고 멈춥니다. 끊김 표시(상단 배너)와 재연결 정책은 T15입니다.
 - **CORS는 아직 없습니다.** 웹앱을 다른 포트에서 띄울 때의 처리는 T12에서 정합니다.
 
+## 히스토리 API
+
+지난 녹음을 보는 API입니다(T10). DB에 저장된 내용만 읽습니다.
+
+| 요청 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `GET /api/sessions` | 히스토리 목록 | `200`과 `{ "sessions": [...] }`. 끝난 세션(`ended`, `interrupted`) 중 세그먼트가 있는 것만, 최근에 시작한 것부터 전부. 녹음 중인 세션과 세그먼트가 없는 세션은 빠집니다 |
+| `GET /api/sessions/:id` | 한 세션의 저장된 내용 | `200`과 `{ "session": …, "segments": [...] }`. 세그먼트는 순서대로. 녹음 중이거나 세그먼트가 없는 세션도 응답합니다. 없는 번호면 `404` `SESSION_NOT_FOUND`, 번호가 양의 정수가 아니면 `400` `INVALID_SESSION_ID` |
+
+목록의 항목은 세션에 두 필드를 더한 `SessionSummary`이고, 상세의 세그먼트는 `Segment`입니다. 둘 다 `packages/shared`에 있습니다.
+
+| 필드 | 담는 값 |
+| --- | --- |
+| `segmentCount` | 저장된 세그먼트 개수 |
+| `preview` | 첫 세그먼트의 `text`. 자르지 않고 보냅니다 |
+| `segments[]` | `segmentId`, `text`, `startMs`, `endMs`. `segments` 테이블 한 행입니다 |
+
+```bash
+curl localhost:3000/api/sessions      # 목록
+curl localhost:3000/api/sessions/7    # 상세 (7은 목록의 id)
+```
+
+```json
+{"sessions":[{"id":23,"status":"ended","startedAt":"2026-10-15T02:16:29.993Z","endedAt":"2026-10-15T02:16:36.460Z","segmentCount":7,"preview":"안녕하세요 오늘 회의를 시작하겠습니다"}]}
+```
+
+- **녹음 중인 세션의 상세는 DB에 저장된 세그먼트만 보여 줍니다.** 실시간 내용은 스트림으로 봅니다.
+- **서버가 강제로 꺼진 세션은 `endedAt`이 서버를 다시 켠 시각입니다.** `endedAt - startedAt`으로 길이를 세면 실제보다 길게 나옵니다. 보정할지는 T16 전에 정합니다.
+- **DB가 꺼져 있으면 `500`입니다.** 다른 세션 API와 같습니다.
+
 ## DB 스키마
 
 스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 `002_session_status.sql`까지 있습니다.
@@ -298,7 +329,7 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 | 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다 | 전부 | 구현됨 (T07) |
 | 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
 | DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 구현됨 (T08) |
-| 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | 예정 (T10, T16) |
+| 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | API 구현됨 (T10), 화면은 예정 (T16) |
 
 서버 코드에서 어댑터를 쓰는 방법입니다. 변수 타입을 `SttAdapter`로 두면 나중에 실제 STT로 바꿀 때 `new MockSttAdapter()` 한 곳만 바뀝니다.
 
@@ -348,6 +379,6 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), 히스토리 API는 [`T10.md`](guides/T10.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
