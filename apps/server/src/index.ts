@@ -56,6 +56,8 @@ function shutdown(signal: string): void {
         process.exit(0);
       });
   });
+  // SSE 연결은 스스로 끝나지 않아, 닫아야 위의 server.close가 끝난다. 웹앱은 알아서 다시 접속을 시도한다.
+  sessions.disconnectSubscribers();
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));

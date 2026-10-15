@@ -2,4 +2,6 @@
 export const APP_NAME = 'speech-transcriber';
 
 export type { Session, SessionStatus } from './session';
+export { STREAM_HEARTBEAT_MS } from './stream';
+export type { SessionStreamMessage } from './stream';
 export type { SttEvent, SttEventType } from './stt';

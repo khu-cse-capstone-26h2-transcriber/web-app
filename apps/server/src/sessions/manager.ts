@@ -1,5 +1,5 @@
 // 진행 중인 세션 하나와 그 세션의 STT 어댑터를 들고, 시작과 종료의 상태 전이를 맡는다.
-import type { Session, SttEvent } from '@app/shared';
+import type { Session, SessionStreamMessage, SttEvent } from '@app/shared';
 import type { Pool } from 'pg';
 import { HttpError } from '../http/errors';
 import { SegmentWriter } from '../segments/writer';
@@ -9,12 +9,21 @@ import { closeSession, findSession, insertSession, interruptOpenSessions } from 
 // idle → starting → recording → stopping → idle. 단일 사용자라 진행 중인 세션은 하나뿐이다.
 type ManagerState = 'idle' | 'starting' | 'recording' | 'stopping';
 
+// 진행 중인 세션의 메시지를 받는 쪽. 지금은 SSE 연결 하나가 하나다. WebSocket으로 바꿔도 이 모양은 그대로다.
+export interface SessionSubscriber {
+  send(message: SessionStreamMessage): void;
+  // 더 보낼 메시지가 없을 때 부른다. 연결을 닫는다.
+  close(): void;
+}
+
 interface ActiveSession {
   session: Session;
   adapter: SttAdapter;
   adapterStopped: boolean;
   // 이 세션의 final 세그먼트를 DB에 쓴다.
   writer: SegmentWriter;
+  // 이 세션의 이벤트를 실시간으로 받는 쪽
+  subscribers: Set<SessionSubscriber>;
   partialCount: number;
   finalCount: number;
 }
@@ -60,6 +69,7 @@ export class SessionManager {
         adapter: this.createAdapter(),
         adapterStopped: false,
         writer: new SegmentWriter(this.pool, session.id),
+        subscribers: new Set(),
         partialCount: 0,
         finalCount: 0,
       };
@@ -85,12 +95,7 @@ export class SessionManager {
   async stop(id: number): Promise<Session> {
     const active = this.active;
     if (this.state !== 'recording' || !active || active.session.id !== id) {
-      // 진행 중인 세션이 아니다. 없는 번호인지, 이미 끝난 세션인지 구분해 알린다.
-      const found = await findSession(this.pool, id);
-      if (!found) {
-        throw new HttpError(404, 'SESSION_NOT_FOUND', `세션을 찾을 수 없습니다: ${id}`);
-      }
-      throw new HttpError(409, 'SESSION_NOT_ACTIVE', `진행 중인 세션이 아닙니다: ${id}`);
+      throw await this.notActiveError(id);
     }
 
     this.state = 'stopping';
@@ -114,8 +119,12 @@ export class SessionManager {
     this.state = 'idle';
     // 서버 밖에서 행이 이미 닫힌 경우.
     if (!closed) {
+      this.closeSubscribers(active);
       throw new HttpError(409, 'SESSION_NOT_ACTIVE', `진행 중인 세션이 아닙니다: ${id}`);
     }
+    // 종료를 알리고 스트림을 닫는다. 종료에 실패했을 때는 스트림을 그대로 둔다.
+    this.broadcast(active, { type: 'ended', session: closed });
+    this.closeSubscribers(active);
     console.log(
       `[session] #${id} 종료 - partial ${active.partialCount}개, final ${active.finalCount}개, 저장 ${active.writer.savedCount}개`,
     );
@@ -129,6 +138,8 @@ export class SessionManager {
 
     this.active = undefined;
     this.state = 'idle';
+    // 보통은 disconnectSubscribers로 이미 닫혀 있다.
+    this.closeSubscribers(active);
     if (!active.adapterStopped) await active.adapter.stop();
     // 밀린 세그먼트를 마지막으로 써 본다. 서버가 꺼지는 중이라 실패하면 더 기다리지 않는다.
     try {
@@ -144,8 +155,56 @@ export class SessionManager {
     );
   }
 
+  // 진행 중인 세션의 이벤트를 받기 시작한다. 그 세션이 진행 중이 아니면 404나 409를 던진다.
+  // 돌려준 함수를 부르면 그만 받는다. 접속하기 전에 지나간 이벤트는 보내지 않는다.
+  async subscribe(id: number, subscriber: SessionSubscriber): Promise<() => void> {
+    const active = this.active;
+    if (this.state !== 'recording' || !active || active.session.id !== id) {
+      throw await this.notActiveError(id);
+    }
+
+    active.subscribers.add(subscriber);
+    console.log(`[stream] #${id} 연결 (지금 ${active.subscribers.size}개)`);
+    return () => {
+      // 세션이 끝나며 이미 비운 경우에는 찍지 않는다.
+      if (active.subscribers.delete(subscriber)) {
+        console.log(`[stream] #${id} 연결 끊김 (지금 ${active.subscribers.size}개)`);
+      }
+    };
+  }
+
+  // 서버를 끌 때 HTTP 서버를 닫으면서 부른다. 스트림은 스스로 끝나지 않아 닫아야 서버가 닫힌다.
+  // 세션은 그대로 두고, shutdown에서 닫는다.
+  disconnectSubscribers(): void {
+    if (this.active) this.closeSubscribers(this.active);
+  }
+
+  // 진행 중인 세션이 아닐 때의 에러. 없는 번호인지, 이미 끝난 세션인지 구분해 알린다.
+  private async notActiveError(id: number): Promise<HttpError> {
+    const found = await findSession(this.pool, id);
+    if (!found) {
+      return new HttpError(404, 'SESSION_NOT_FOUND', `세션을 찾을 수 없습니다: ${id}`);
+    }
+    return new HttpError(409, 'SESSION_NOT_ACTIVE', `진행 중인 세션이 아닙니다: ${id}`);
+  }
+
+  // 받는 쪽 모두에게 보낸다. 한 곳에서 실패해도 나머지와 STT 처리는 계속한다.
+  private broadcast(active: ActiveSession, message: SessionStreamMessage): void {
+    for (const subscriber of active.subscribers) {
+      try {
+        subscriber.send(message);
+      } catch (error) {
+        console.error(`[stream] #${active.session.id} 메시지를 보내지 못했습니다:`, error);
+      }
+    }
+  }
+
+  private closeSubscribers(active: ActiveSession): void {
+    for (const subscriber of active.subscribers) subscriber.close();
+    active.subscribers.clear();
+  }
+
   // 어댑터가 준 이벤트는 이 세션의 것이다. 이벤트에는 세션 번호가 없고, 서버가 여기서 묶는다.
-  // T07(SSE)이 이 자리에서 이벤트를 받아 간다.
   private handleEvent(active: ActiveSession, event: SttEvent): void {
     if (event.type === 'final') {
       active.finalCount += 1;
@@ -154,5 +213,7 @@ export class SessionManager {
     } else {
       active.partialCount += 1;
     }
+    // partial과 final 모두 실시간으로 보낸다.
+    this.broadcast(active, event);
   }
 }
