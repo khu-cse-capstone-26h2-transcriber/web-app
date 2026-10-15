@@ -20,7 +20,7 @@ export function createApp(pool: Pool, sessions: SessionManager): Express {
   });
 
   // API는 모두 /api 아래에 둔다.
-  app.use('/api/sessions', createSessionRouter(sessions));
+  app.use('/api/sessions', createSessionRouter(pool, sessions));
 
   // 라우트 뒤에 둔다. 순서가 바뀌면 모든 요청이 404가 된다.
   app.use(notFoundHandler);

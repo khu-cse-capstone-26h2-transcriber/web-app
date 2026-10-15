@@ -1,5 +1,5 @@
 // sessions 테이블을 읽고 쓰는 SQL. 세션 상태는 여기서만 바꾼다.
-import type { Session, SessionStatus } from '@app/shared';
+import type { Session, SessionStatus, SessionSummary } from '@app/shared';
 import type { Pool } from 'pg';
 
 // pg는 bigint를 문자열로, timestamptz를 Date로 준다.
@@ -50,6 +50,32 @@ export async function closeSession(
     [id, status],
   );
   return rows[0] ? toSession(rows[0]) : undefined;
+}
+
+interface SessionSummaryRow extends SessionRow {
+  segment_count: number;
+  preview: string;
+}
+
+// 히스토리 목록. 끝난 세션(ended, interrupted) 중 세그먼트가 하나 이상인 것만, 최근에 시작한 것부터.
+export async function listFinishedSessions(pool: Pool): Promise<SessionSummary[]> {
+  const { rows } = await pool.query<SessionSummaryRow>(
+    `select s.id, s.status, s.started_at, s.ended_at, g.segment_count, g.preview
+     from sessions s
+     cross join lateral (
+       select count(*)::int as segment_count,
+              (select text from segments where session_id = s.id order by segment_id limit 1) as preview
+       from segments
+       where session_id = s.id
+     ) g
+     where s.status <> 'recording' and g.segment_count > 0
+     order by s.started_at desc, s.id desc`,
+  );
+  return rows.map((row) => ({
+    ...toSession(row),
+    segmentCount: row.segment_count,
+    preview: row.preview,
+  }));
 }
 
 // 녹음 중으로 남아 있는 세션을 모두 중단으로 닫고, 닫은 세션 번호를 돌려준다.

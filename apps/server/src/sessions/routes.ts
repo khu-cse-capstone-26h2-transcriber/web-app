@@ -1,9 +1,12 @@
 // 세션 API. app.ts에서 /api/sessions 아래에 붙인다.
 import { STREAM_HEARTBEAT_MS, type SessionStreamMessage } from '@app/shared';
 import express, { type Router } from 'express';
+import type { Pool } from 'pg';
 import { HttpError } from '../http/errors';
 import { SseStream } from '../http/sse';
+import { listSegments } from '../segments/repository';
 import type { SessionManager } from './manager';
+import { findSession, listFinishedSessions } from './repository';
 
 const HEARTBEAT: SessionStreamMessage = { type: 'heartbeat' };
 
@@ -16,17 +19,33 @@ function parseSessionId(value: string): number {
   return id;
 }
 
-export function createSessionRouter(sessions: SessionManager): Router {
+// 히스토리(목록, 상세)는 DB만 읽으므로 pool로 직접 읽는다. 시작·종료·스트림은 SessionManager가 맡는다.
+export function createSessionRouter(pool: Pool, sessions: SessionManager): Router {
   const router = express.Router();
+
+  // 히스토리 목록. 끝난 세션 중 세그먼트가 있는 것만, 최근에 시작한 것부터.
+  router.get('/', async (_req, res) => {
+    res.json({ sessions: await listFinishedSessions(pool) });
+  });
 
   // 세션을 시작한다. 진행 중인 세션이 있으면 409.
   router.post('/', async (_req, res) => {
     res.status(201).json({ session: await sessions.start() });
   });
 
-  // 진행 중인 세션. 없으면 session이 null이다. 나중에 '/:id'를 더할 때 이 라우트를 앞에 둔다.
+  // 진행 중인 세션. 없으면 session이 null이다. '/:id'보다 앞에 있어야 active가 번호로 읽히지 않는다.
   router.get('/active', (_req, res) => {
     res.json({ session: sessions.getActive() });
+  });
+
+  // 히스토리 상세. 세션과 저장된 세그먼트. 녹음 중이거나 세그먼트가 없는 세션도 볼 수 있다.
+  router.get('/:id', async (req, res) => {
+    const id = parseSessionId(req.params.id);
+    const session = await findSession(pool, id);
+    if (!session) {
+      throw new HttpError(404, 'SESSION_NOT_FOUND', `세션을 찾을 수 없습니다: ${id}`);
+    }
+    res.json({ session, segments: await listSegments(pool, id) });
   });
 
   // 세션을 종료한다. 없는 번호면 404, 진행 중이 아니면 409.

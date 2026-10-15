@@ -12,3 +12,11 @@ export interface Session {
   // 녹음 중이면 null
   endedAt: string | null;
 }
+
+// 히스토리 목록의 한 항목. 세션 정보에 요약을 더한다.
+export interface SessionSummary extends Session {
+  // 저장된 세그먼트 개수
+  segmentCount: number;
+  // 첫 세그먼트의 text. 자르지 않고 그대로 보낸다.
+  preview: string;
+}
