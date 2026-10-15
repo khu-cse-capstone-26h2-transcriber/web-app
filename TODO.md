@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-14
+마지막 갱신: 2026-10-15
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -135,7 +135,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-10-14 | T08 | 완료 | 브랜치 `feat/t08-segment-storage`에서 `segments/repository.ts`(`upsertSegment`), `segments/writer.ts`(`SegmentWriter`) 작성, `sessions/manager.ts` 수정, 지침서 `T08.md` 작성. final이 올 때마다 `segments`에 한 행씩 저장하고 partial은 저장하지 않음. DB에 닿지 못하면 메모리에 두었다가 다음 final과 종료 때 순서대로 다시 씀. 완료 기준 16개 통과. 사용자 확정: 저장 실패 시 재시도, 중복 final은 덮어쓰기. 지침서 없이 정한 것: DB가 거절한 행(값·제약 오류)은 재시도하지 않고 버림, 대기열 상한 없음. 스키마는 바꾸지 않음 | 정지할 때 말하던 문장은 저장되지 않음(D4의 C3, AI 파트). 대기열 상한은 T21 때 확인. 로컬 DB에 확인용 세션 13개, 세그먼트 32행 남음 | T07, T10 (T12는 D3 결정 필요) |
+| 2026-10-14 | T08 | 완료 | 브랜치 `feat/t08-segment-storage`에서 `segments/repository.ts`(`upsertSegment`), `segments/writer.ts`(`SegmentWriter`) 작성, `sessions/manager.ts` 수정, 지침서 `T08.md` 작성. final이 올 때마다 `segments`에 한 행씩 저장하고 partial은 저장하지 않음. DB에 닿지 못하면 메모리에 두었다가 다음 final과 종료 때 순서대로 다시 씀. 완료 기준 16개 통과. 사용자 확정: 저장 실패 시 재시도, 중복 final은 덮어쓰기. 지침서 없이 정한 것: DB가 거절한 행(값·제약 오류)은 재시도하지 않고 버림, 대기열 상한 없음. 스키마는 바꾸지 않음. `main`에 병합하고 push(2026-10-15) | 정지할 때 말하던 문장은 저장되지 않음(D4의 C3, AI 파트). 대기열 상한은 T21 때 확인. 로컬 DB에 확인용 세션 13개, 세그먼트 32행 남음 | T07, T10 (T12는 D3 결정 필요) |
 | 2026-10-13 | T06 | 완료 | 브랜치 `feat/t06-session-api`에서 마이그레이션 `002_session_status.sql`(`status` 컬럼: `recording`·`ended`·`interrupted`), 공용 `Session` 타입, `sessions/repository.ts`·`manager.ts`·`routes.ts`, 지침서 `T06.md` 작성. API는 `POST /api/sessions`, `POST /api/sessions/:id/stop`, `GET /api/sessions/active`. 시작하면 mock STT가 켜지고, 서버를 켤 때 녹음 중으로 남은 세션을 `interrupted`로 닫음. 완료 기준 17개 통과. 사용자 확정: 경로, `status` 컬럼, 중복 시작 409, 재시작 처리. 지침서에 코드 전문은 싣지 않음(구현과 같은 세션에서 작성). `main`에 병합하고 push | DB가 꺼져 있을 때 세션 API가 500(503으로 맞출지 T13 전 결정). 로컬 DB에 확인용 세션 6개 남음. 물리 버튼 시작과 정지 뒤 final 대기는 D4 협의 | T07, T08 (T12는 D3 결정 필요) |
 | 2026-10-13 | T04 | 완료 | 브랜치 `feat/t04-server-skeleton`에서 `express` 5.3.0·`@types/express` 5.0.6 설치, pg 연결 풀 `db/pool.ts`, 에러 형식과 미들웨어 `http/errors.ts`, 앱 조립 `app.ts`, 진입점 `index.ts` 교체(listen, 종료 처리). 완료 기준 13개 통과. 사전 검증에서 보류됐던 DB 켜진 상태의 `/health` 200과 DB 재시작 뒤 회복을 확인. 지침서와 다른 점: Ctrl+C 대신 같은 프로세스들에 `SIGINT`를 보내 확인. `main`에 병합하고 push | DB를 켠 직후 첫 `/health`는 503, 준비되면 200. 서버 listen 주소(D5)와 CORS(T12)는 미정 | T06 (T12는 D3 결정 필요) |
 | 2026-10-13 | 저장소 이전 | 완료 | 팀이 organization에서 함께 정리하기로 해 개인 저장소의 작업을 `khu-cse-capstone-26h2-transcriber/web-app`(private)으로 옮김. `main` 커밋 27개 push, `origin` 변경, 개인 저장소 `gwangholee507/speech-transcriber-app`은 archive. 처음 정한 Public은 히스토리 점검(옛 `CLAUDE.md`, 작성자 이메일) 뒤 Private으로 바꿈(사용자 결정) | 공개 전환 여부 미정. `v33jy`는 read 권한이라 push 불가 | T04 |
