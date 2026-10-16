@@ -24,6 +24,8 @@ interface ActiveSession {
   writer: SegmentWriter;
   // 이 세션의 이벤트를 실시간으로 받는 쪽
   subscribers: Set<SessionSubscriber>;
+  // 이 세션에서 나온 final을 온 순서대로 모은다. 새로 접속한 쪽에 먼저 보낸다. DB가 꺼져 있어도 보낼 수 있게 메모리에 둔다.
+  finals: SttEvent[];
   partialCount: number;
   finalCount: number;
 }
@@ -70,6 +72,7 @@ export class SessionManager {
         adapterStopped: false,
         writer: new SegmentWriter(this.pool, session.id),
         subscribers: new Set(),
+        finals: [],
         partialCount: 0,
         finalCount: 0,
       };
@@ -156,15 +159,31 @@ export class SessionManager {
   }
 
   // 진행 중인 세션의 이벤트를 받기 시작한다. 그 세션이 진행 중이 아니면 404나 409를 던진다.
-  // 돌려준 함수를 부르면 그만 받는다. 접속하기 전에 지나간 이벤트는 보내지 않는다.
-  async subscribe(id: number, subscriber: SessionSubscriber): Promise<() => void> {
+  // 먼저 지금까지의 final을 보내고, 그 뒤로 실시간 이벤트를 보낸다. afterSegmentId를 주면 그 번호 뒤의 final만 먼저 보낸다.
+  // 접속하기 전의 partial은 보내지 않는다. 다음 partial이 그 문장의 전체 텍스트를 다시 보낸다.
+  // 돌려준 함수를 부르면 그만 받는다.
+  async subscribe(
+    id: number,
+    subscriber: SessionSubscriber,
+    afterSegmentId?: number,
+  ): Promise<() => void> {
     const active = this.active;
     if (this.state !== 'recording' || !active || active.session.id !== id) {
       throw await this.notActiveError(id);
     }
 
+    // 여기서부터 등록까지 await가 없어, 그 사이에 새 이벤트가 끼어들지 않는다.
+    const missed =
+      afterSegmentId === undefined
+        ? active.finals
+        : active.finals.filter((event) => event.segmentId > afterSegmentId);
+    for (const event of missed) subscriber.send(event);
+
     active.subscribers.add(subscriber);
-    console.log(`[stream] #${id} 연결 (지금 ${active.subscribers.size}개)`);
+    const from = afterSegmentId === undefined ? '' : `Last-Event-ID ${afterSegmentId} 뒤 `;
+    console.log(
+      `[stream] #${id} 연결 (지금 ${active.subscribers.size}개, ${from}final ${missed.length}개 먼저 보냄)`,
+    );
     return () => {
       // 세션이 끝나며 이미 비운 경우에는 찍지 않는다.
       if (active.subscribers.delete(subscriber)) {
@@ -208,6 +227,7 @@ export class SessionManager {
   private handleEvent(active: ActiveSession, event: SttEvent): void {
     if (event.type === 'final') {
       active.finalCount += 1;
+      active.finals.push(event);
       // final만 DB에 저장한다. partial은 저장하지 않는다.
       active.writer.enqueue(event);
     } else {

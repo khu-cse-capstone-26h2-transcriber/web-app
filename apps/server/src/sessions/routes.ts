@@ -5,7 +5,7 @@ import type { Pool } from 'pg';
 import { HttpError } from '../http/errors';
 import { SseStream } from '../http/sse';
 import { listSegments } from '../segments/repository';
-import type { SessionManager } from './manager';
+import type { SessionManager, SessionSubscriber } from './manager';
 import { findSession, listFinishedSessions } from './repository';
 
 const HEARTBEAT: SessionStreamMessage = { type: 'heartbeat' };
@@ -17,6 +17,25 @@ function parseSessionId(value: string): number {
     throw new HttpError(400, 'INVALID_SESSION_ID', `세션 번호는 양의 정수여야 합니다: ${value}`);
   }
   return id;
+}
+
+// Last-Event-ID 헤더를 마지막으로 받은 final의 segmentId로 읽는다. 없거나 비어 있으면 undefined(처음부터)다.
+function parseLastEventId(value: string | undefined): number | undefined {
+  if (value === undefined || value === '') return undefined;
+  const id = Number(value);
+  if (!/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(id)) {
+    throw new HttpError(
+      400,
+      'INVALID_LAST_EVENT_ID',
+      `Last-Event-ID는 0 이상의 정수여야 합니다: ${value}`,
+    );
+  }
+  return id;
+}
+
+// SSE id는 final에만 segmentId로 붙인다. partial, heartbeat, ended는 브라우저가 기억하는 id를 바꾸지 않는다.
+function sseEventId(message: SessionStreamMessage): string | undefined {
+  return message.type === 'final' ? String(message.segmentId) : undefined;
 }
 
 // 히스토리(목록, 상세)는 DB만 읽으므로 pool로 직접 읽는다. 시작·종료·스트림은 SessionManager가 맡는다.
@@ -55,11 +74,17 @@ export function createSessionRouter(pool: Pool, sessions: SessionManager): Route
   });
 
   // 진행 중인 세션의 partial/final을 SSE로 보낸다. 세션이 끝나면 ended를 보내고 닫는다.
+  // 접속하면 지금까지의 final을 먼저 보낸다. Last-Event-ID가 있으면 그 번호 뒤의 final만 보낸다.
   router.get('/:id/events', async (req, res) => {
     const id = parseSessionId(req.params.id);
+    const afterSegmentId = parseLastEventId(req.get('Last-Event-ID'));
     const stream = new SseStream(res, { intervalMs: STREAM_HEARTBEAT_MS, message: HEARTBEAT });
+    const subscriber: SessionSubscriber = {
+      send: (message) => stream.send(message, sseEventId(message)),
+      close: () => stream.close(),
+    };
     // 진행 중인 세션이 아니면 404나 409를 던진다. 아직 헤더를 보내지 않아 에러 JSON으로 응답된다.
-    const unsubscribe = await sessions.subscribe(id, stream);
+    const unsubscribe = await sessions.subscribe(id, subscriber, afterSegmentId);
     res.on('close', unsubscribe);
     stream.start();
   });

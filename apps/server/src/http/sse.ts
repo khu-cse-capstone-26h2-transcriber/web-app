@@ -36,11 +36,14 @@ export class SseStream {
     this.timer = setInterval(() => this.send(this.heartbeat.message), this.heartbeat.intervalMs);
   }
 
-  send(data: unknown): void {
+  // id를 주면 data 앞에 id 줄을 쓴다. 브라우저는 다시 접속할 때 마지막으로 받은 id를 Last-Event-ID로 보낸다.
+  // id 없이 보낸 메시지는 브라우저가 기억하는 id를 바꾸지 않는다.
+  send(data: unknown, id?: string): void {
     if (this.closed) return;
     this.start();
+    const idLine = id === undefined ? '' : `id: ${id}\n`;
     // JSON.stringify는 줄바꿈을 \n으로 바꾸므로 data 한 줄에 들어간다.
-    this.res.write(`data: ${JSON.stringify(data)}\n\n`);
+    this.res.write(`${idLine}data: ${JSON.stringify(data)}\n\n`);
   }
 
   // 스트림을 닫는다. 여러 번 불러도 된다.
