@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-15
+마지막 갱신: 2026-10-16
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -91,7 +91,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - [x] T06 세션 시작/종료 API와 상태 전이 — P0 · 단계 4 · 선행: T04, T05 · 협의: 없음
 - [x] T07 SSE 스트림 엔드포인트(mock 이벤트, heartbeat) — P0 · 단계 5 · 선행: T06 · 협의: 없음
 - [x] T08 세그먼트 DB 저장(partial/final 구분) — P0 · 단계 5 · 선행: T03, T06 · 협의: 없음
-- [ ] T09 SSE 재연결 이어받기(`Last-Event-ID`) — P1 · 단계 6 · 선행: T07, T08 · 협의: 없음
+- [x] T09 SSE 재연결 이어받기(`Last-Event-ID`) — P1 · 단계 6 · 선행: T07, T08 · 협의: 없음
 
 ### 웹앱 화면
 
@@ -136,6 +136,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-16 | T09 | 완료 | 브랜치 `feat/t09-sse-resume`에서 `http/sse.ts`(`id:` 줄), `sessions/manager.ts`(진행 중인 세션의 final 목록, `subscribe`에서 먼저 보내기), `sessions/routes.ts`(`Last-Event-ID` 읽기, final에 `segmentId`를 `id`로), `shared/src/stream.ts`(규칙 주석) 수정, 지침서 `T09.md` 작성, T07 지침서에 바뀐 결정 덧붙임. 접속하면 지금까지의 final을 먼저 보내고, `Last-Event-ID`가 있으면 그 번호 뒤의 것만 보냄. 완료 기준 19개 통과(브라우저 `EventSource` 재접속 포함). 사용자 확정: final에만 `segmentId`로 `id`, 헤더가 없으면 처음부터(T07 결정 변경), 메모리에서 다시 보냄, 끝난 세션은 `409` 그대로. 지침서 없이 정한 것: heartbeat·`ended`에는 `id` 없음, 잘못된 헤더 `400`, 말하던 중이던 partial은 다시 보내지 않음, final 목록 상한 없음 | `main` 병합·push 안 함. `id`는 `segmentId`가 0부터 늘어난다는 D4 초안에 기댐 [AI]. `retry:`와 `409`일 때 상세 API로 채우기는 T15. final 목록 메모리는 T21. 로컬 DB에 확인용 세션 28개, 세그먼트 189행 | T11은 D6, T12는 D3 결정 필요 (결정 없이 시작할 수 있는 P0·P1 없음) |
 | 2026-10-15 | T10 | 완료 | 브랜치 `feat/t10-history-api`에서 공용 `Segment`(`shared/src/segment.ts`)·`SessionSummary` 타입, `listFinishedSessions`(`sessions/repository.ts`)·`listSegments`(`segments/repository.ts`), 라우트 `GET /api/sessions`(목록)·`GET /api/sessions/:id`(상세) 추가, 지침서 `T10.md` 작성. 목록은 끝난 세션 중 세그먼트가 있는 것만 최신순 전부, 항목마다 `segmentCount`와 첫 문장 `preview`. 상세는 어느 세션이든 세션과 세그먼트 전체. 완료 기준 18개 통과(psql 비교 포함). 사용자 확정: 세션 아래 주소, 요약 포함, 전부·최신순, 끝난 것만. 지침서 없이 정한 것: 미리보기는 자르지 않음, 녹음 중 세션의 상세는 DB에 저장된 것만, 녹음 길이는 응답에 넣지 않음. `main`에 병합하고 push(2026-10-15) | 강제로 꺼진 세션의 `ended_at` 보정(T16 전, T06에서 넘어옴). 세그먼트 없는 세션은 DB에 남음. T11은 D6 결정 필요. 로컬 DB에 확인용 세션 22개, 세그먼트 105행 | T09 (T11은 D6, T12는 D3 결정 필요) |
 | 2026-10-15 | 문서 기준 정리 | 완료 | 작업 목록과 진행 상황의 기준을 루트 `TODO.md`로 정함(사용자 결정). 로컬 `CLAUDE.md`의 '문서 링크' 절을 고쳐, 진행 보드·TODO 문서(claude.ai)는 2026-10-10 이후 갱신하지 않은 참고용으로 표시하고 내용이 다르면 `TODO.md`를 따르도록 함 | 진행 보드와 TODO 문서는 갱신하지 않음(D2 Fastify 제안, 옛 백로그 상태가 남음) | T10 (T12는 D3 결정 필요) |
 | 2026-10-15 | T07 | 완료 | 브랜치 `feat/t07-sse-stream`에서 공용 `SessionStreamMessage`·`STREAM_HEARTBEAT_MS`(`shared/src/stream.ts`), `http/sse.ts`(`SseStream`) 작성, `sessions/manager.ts`(구독 관리)·`routes.ts`(`GET /api/sessions/:id/events`)·`index.ts`(서버 종료 때 스트림을 먼저 닫음) 수정, 지침서 `T07.md` 작성. partial/final을 `data` 한 줄 JSON으로 보내고 15초마다 heartbeat, 종료하면 `ended` 뒤 스트림을 닫음. 완료 기준 17개 통과(브라우저 `EventSource` 포함). 사용자 확정: 세션별 주소, 접속 이후 이벤트만, `data` 안의 `type`으로 구분, heartbeat 15초. 지침서 없이 정한 것: heartbeat도 JSON 메시지로 보냄(T15 끊김 감지용), 동시 접속 제한 없음, 종료 실패 때 스트림 유지. `main`에 병합하고 push(2026-10-15) | 물리 버튼으로 시작한 녹음을 웹앱이 알아채는 방법 [하드웨어](D4). 이벤트 `id:`와 재접속 때 다시 보낼 범위는 T09에서 결정. 로컬 DB에 확인용 세션 20개, 세그먼트 102행 | T10, T09 (T12는 D3 결정 필요) |
