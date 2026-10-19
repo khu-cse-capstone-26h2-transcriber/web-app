@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-10-15 · 이광호
+마지막 갱신: 2026-10-19 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -44,7 +44,7 @@ flowchart LR
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 내보내기는 예정 (T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
-| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | 임시 파일만 있음 (T12~T16 예정) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 제어, 실시간 화면, 히스토리 화면은 예정 (T13~T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS` |
 
 ## 기술 결정
@@ -52,6 +52,7 @@ flowchart LR
 | 항목 | 결정 |
 | --- | --- |
 | 클라이언트 | React 웹앱 |
+| 웹앱 빌드 도구 | Vite. 라우팅은 React Router, 서버 호출은 `fetch` 래퍼. 개발 중에는 Vite 프록시로 서버에 연결 (CORS 없음) |
 | 백엔드 | Node.js + TypeScript, npm workspaces 모노레포 |
 | 서버 프레임워크 | Express |
 | 실시간 전달 | SSE로 시작, 추후 WebSocket 전환을 고려해 설계 |
@@ -65,7 +66,6 @@ flowchart LR
 
 아직 정해지지 않은 것은 다음과 같습니다. 결정 번호는 `TODO.md`의 표기입니다.
 
-- 웹앱 빌드 도구 (D3, T12 전)
 - STT 호출 방법, 오디오 입력 형식, partial/final 이벤트의 최종 형식 (D4, AI·하드웨어 파트 협의)
 - Rubik Pi OS, 입출력 구성, 기기 수령 시점 (D5, 하드웨어 파트 협의)
 - 히스토리 다운로드 포맷 (D6, T11 전)
@@ -109,6 +109,20 @@ speech-transcriber/
 │  │        ├─ mock.ts        # MockSttAdapter
 │  │        └─ demo.ts        # mock 이벤트 확인용 스크립트
 │  └─ web/                    # @app/web — React 웹앱
+│     ├─ index.html           # 웹앱 HTML (#root)
+│     ├─ vite.config.ts       # Vite 설정. /api, /health를 서버로 넘기는 프록시
+│     ├─ tsconfig.json        # 브라우저 코드(src) 타입 검사
+│     ├─ tsconfig.node.json   # vite.config.ts 타입 검사
+│     └─ src/
+│        ├─ main.tsx          # 진입점 (라우터를 #root에 붙임)
+│        ├─ router.tsx        # 화면 주소
+│        ├─ api/
+│        │  ├─ client.ts      # fetch 래퍼, ApiError
+│        │  ├─ endpoints.ts   # 서버 API 함수 (/health, 히스토리 목록·상세)
+│        │  └─ useApiData.ts  # 화면에서 API 하나를 불러 쓰는 훅
+│        ├─ components/
+│        │  └─ Layout.tsx     # 공통 틀 (메뉴, 서버 상태)
+│        └─ pages/            # 녹음, 히스토리 목록·상세, 없는 주소 화면
 ├─ packages/
 │  └─ shared/                 # @app/shared — 서버·웹 공용 타입과 상수
 │     └─ src/
@@ -134,12 +148,38 @@ docker compose up -d # 로컬 PostgreSQL 실행 (끌 때는 docker compose down)
 npm run db:migrate   # 아직 적용하지 않은 마이그레이션 실행 (다시 실행해도 안전)
 npm run typecheck    # 모든 워크스페이스 타입 검사
 npm run dev:server   # 서버 실행 (끌 때는 Ctrl+C)
+npm run dev:web      # 웹앱 개발 서버 실행 (http://localhost:5173, 서버도 켜 둠)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
 
 `dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다.
 
 `PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
+
+## 웹앱
+
+`npm run dev:web`으로 Vite 개발 서버를 띄우고 브라우저에서 `http://localhost:5173`을 엽니다(T12). 웹앱은 서버 API를 `/api/…`, `/health` 같은 같은 출처의 경로로 부르고, Vite 개발 서버가 이 요청을 루트 `.env`의 `PORT`에서 도는 서버로 넘깁니다. 그래서 서버에 CORS 설정이 없습니다. SSE 스트림도 이 프록시를 거쳐 그대로 옵니다. `.env`에 `PORT`가 없으면 Vite가 그 사실을 알리고 시작하지 않습니다.
+
+| 주소 | 화면 | 상태 |
+| --- | --- | --- |
+| `/` | 녹음 | 자리만 있음. 녹음 제어는 T13, 실시간 자막은 T14 |
+| `/history` | 히스토리 목록 | 목록 API 결과를 그대로 보여 줌. 화면 구성은 T16 |
+| `/history/:id` | 히스토리 상세 | 상세 API로 상태, 시작 시각, 세그먼트 개수만 보여 줌. 본문과 다운로드는 T16 |
+| 그 밖의 주소 | 페이지를 찾을 수 없음 | |
+
+모든 화면 위쪽에 메뉴와 서버 상태가 있습니다. 서버 상태는 웹앱을 열 때 `/health`를 한 번 불러 `정상`, `DB에 연결하지 못했습니다`, `서버에 연결하지 못했습니다` 중 하나로 보여 줍니다.
+
+서버 API는 `src/api/endpoints.ts`의 함수로 부릅니다. 실패하면 서버가 보낸 `code`와 `message`를 담은 `ApiError`를 던지고, 서버에 닿지 못하면 `code`가 `NETWORK_ERROR`입니다.
+
+```ts
+import { listSessions } from './api/endpoints';
+import { useApiData } from './api/useApiData';
+
+const sessions = useApiData((signal) => listSessions(signal), []);
+// sessions.status: 'loading' | 'success'(data) | 'error'(error: ApiError)
+```
+
+`npm run build -w @app/web`은 `apps/web/dist`에 정적 파일을 만듭니다. `npm run preview -w @app/web`(`http://localhost:4173`)으로 빌드 결과를 같은 프록시와 함께 볼 수 있습니다. 기기에서 빌드 결과를 누가 내보낼지(Express가 직접 내보낼지 등)는 아직 정하지 않았습니다.
 
 ## 세션 API
 
@@ -221,7 +261,7 @@ source.onmessage = (event) => {
 - **종료가 실패하면**(예: DB가 꺼짐) 스트림은 닫히지 않고 heartbeat만 옵니다. 다시 종료해 성공하면 `ended`가 옵니다.
 - **서버를 끄면** `ended` 없이 스트림이 끊깁니다. 세션은 `interrupted`로 닫힙니다.
 - **`EventSource`는 끊기면 스스로 다시 접속합니다.** 끝난 세션에 다시 접속하면 `409`를 받고 멈춥니다. 끊긴 사이에 세션이 끝났다면 남은 문장은 상세 API(T10)로 받습니다. 끊김 표시(상단 배너)와 재연결 정책은 T15입니다.
-- **CORS는 아직 없습니다.** 웹앱을 다른 포트에서 띄울 때의 처리는 T12에서 정합니다.
+- **CORS는 두지 않습니다.** 웹앱은 Vite 프록시를 거쳐 같은 출처로 스트림을 엽니다(T12). 프록시를 거쳐도 이벤트가 지연 없이 오고 `id:` 줄도 그대로 전달됩니다.
 
 ## 히스토리 API
 
@@ -384,6 +424,6 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
