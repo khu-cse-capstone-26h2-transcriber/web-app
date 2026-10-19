@@ -7,8 +7,9 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p packages/shared",
+    "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/tsconfig.node.json && tsc --noEmit -p packages/shared",
     "dev:server": "npm run dev -w @app/server",
+    "dev:web": "npm run dev -w @app/web",
     "dev:stt": "npm run dev:stt -w @app/server",
     "db:migrate": "npm run db:migrate -w @app/server"
   },
