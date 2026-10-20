@@ -44,7 +44,7 @@ flowchart LR
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 내보내기는 예정 (T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
-| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 제어, 실시간 화면, 히스토리 화면은 예정 (T13~T16) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 실시간 화면, 히스토리 화면은 예정 (T14~T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS` |
 
 ## 기술 결정
@@ -153,7 +153,7 @@ npm run dev:web      # 웹앱 개발 서버 실행 (http://localhost:5173, 서�
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
 
-`dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다.
+`dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다. 다른 API도 DB에 닿지 못해 실패하면 `503` `DB_UNAVAILABLE`로 답합니다(T13).
 
 `PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
 
@@ -163,12 +163,24 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 
 | 주소 | 화면 | 상태 |
 | --- | --- | --- |
-| `/` | 녹음 | 자리만 있음. 녹음 제어는 T13, 실시간 자막은 T14 |
+| `/` | 녹음 | 녹음 상태와 보조 시작·종료 버튼 (T13). 실시간 자막은 T14 |
 | `/history` | 히스토리 목록 | 목록 API 결과를 그대로 보여 줌. 화면 구성은 T16 |
 | `/history/:id` | 히스토리 상세 | 상세 API로 상태, 시작 시각, 세그먼트 개수만 보여 줌. 본문과 다운로드는 T16 |
 | 그 밖의 주소 | 페이지를 찾을 수 없음 | |
 
 모든 화면 위쪽에 메뉴와 서버 상태가 있습니다. 서버 상태는 웹앱을 열 때 `/health`를 한 번 불러 `정상`, `DB에 연결하지 못했습니다`, `서버에 연결하지 못했습니다` 중 하나로 보여 줍니다.
+
+녹음 화면(T13)은 화면을 열 때 `GET /api/sessions/active`로 진행 중인 녹음을 확인합니다. 녹음 중이면 `녹음 중 · 01:23 (#12)`처럼 흐른 시간과 세션 번호를 보여 주고, 아니면 `녹음하고 있지 않습니다`를 보여 줍니다. 녹음의 주 제어는 기기의 물리 버튼이고, 화면의 '녹음 시작'·'녹음 종료' 버튼은 개발·시연·원격 종료용 보조 수단입니다.
+
+| 상황 | 화면 |
+| --- | --- |
+| 웹에서 종료 성공 | `/history/:id`로 이동 |
+| 시작했는데 이미 녹음 중 (`409`) | 진행 중인 녹음을 다시 확인해 보여 주고 `이미 진행 중인 녹음이 있어 그 녹음을 보여 줍니다` |
+| 종료했는데 이미 끝남 (`409`, `404`) | 다시 확인하고 `이미 끝난 녹음입니다 (#12)` |
+| 시작·종료 중 DB가 꺼짐 (`503`) | `녹음을 시작하지 못했습니다: DB에 연결하지 못했습니다`, 또는 `녹음을 종료하지 못했습니다: … 잠시 뒤 다시 종료해 주세요`. 종료 실패 때는 녹음 중으로 남아 다시 누를 수 있음 |
+| 서버가 꺼짐 | `녹음 상태를 확인하지 못했습니다: 서버에 연결하지 못했습니다`와 '다시 확인' 버튼 |
+
+화면을 연 뒤 다른 탭이나 기기 버튼으로 시작·종료한 녹음은 새로고침하거나 버튼을 눌러 409를 받을 때 반영됩니다. 바로 알아채는 방법(폴링 또는 알림 스트림)은 D4 협의 뒤에 정합니다. 흐른 시간은 서버의 시작 시각과 브라우저 시계로 계산하므로 두 시계가 다르면 어긋납니다.
 
 서버 API는 `src/api/endpoints.ts`의 함수로 부릅니다. 실패하면 서버가 보낸 `code`와 `message`를 담은 `ApiError`를 던지고, 서버에 닿지 못하면 `code`가 `NETWORK_ERROR`입니다.
 
@@ -191,6 +203,8 @@ const sessions = useApiData((signal) => listSessions(signal), []);
 | `POST /api/sessions` | 세션을 만들고 STT를 켭니다 | `201`과 세션. 진행 중인 세션이 있으면 `409` `SESSION_ALREADY_ACTIVE` |
 | `GET /api/sessions/active` | 진행 중인 세션을 알려 줍니다 | `200`과 세션. 없으면 `{"session":null}` |
 | `POST /api/sessions/:id/stop` | STT를 끄고 세션을 닫습니다 | `200`과 세션. 없는 번호면 `404` `SESSION_NOT_FOUND`, 진행 중이 아니면 `409` `SESSION_NOT_ACTIVE`, 번호가 양의 정수가 아니면 `400` `INVALID_SESSION_ID` |
+
+시작과 종료는 DB에 닿지 못하면 `503` `DB_UNAVAILABLE`입니다. 종료가 실패하면 세션은 녹음 중으로 남으므로, DB가 돌아온 뒤 같은 번호로 다시 종료하면 됩니다. `GET /api/sessions/active`는 서버 메모리만 읽어 DB가 꺼져 있어도 답합니다.
 
 세션은 `{"id":1,"status":"recording","startedAt":"2026-10-13T01:29:37.747Z","endedAt":null}` 모양이고, 타입은 `packages/shared/src/session.ts`의 `Session`입니다.
 
@@ -292,7 +306,7 @@ curl localhost:3000/api/sessions/7    # 상세 (7은 목록의 id)
 
 - **녹음 중인 세션의 상세는 DB에 저장된 세그먼트만 보여 줍니다.** 실시간 내용은 스트림으로 봅니다.
 - **서버가 강제로 꺼진 세션은 `endedAt`이 서버를 다시 켠 시각입니다.** `endedAt - startedAt`으로 길이를 세면 실제보다 길게 나옵니다. 보정할지는 T16 전에 정합니다.
-- **DB가 꺼져 있으면 `500`입니다.** 다른 세션 API와 같습니다.
+- **DB가 꺼져 있으면 `503` `DB_UNAVAILABLE`입니다.** 다른 세션 API와 같습니다(T13 전에는 `500`).
 
 ## DB 스키마
 
@@ -312,7 +326,7 @@ curl localhost:3000/api/sessions/7    # 상세 (7은 목록의 id)
 docker compose exec db psql -U user -d transcriber -c 'select segment_id, text, start_ms, end_ms from segments where session_id = 1 order by segment_id'
 ```
 
-녹음 중에 DB에 닿지 못하면 그동안의 final은 서버 메모리에 쌓였다가, DB가 돌아온 뒤 다음 final이 올 때나 종료할 때 순서대로 저장됩니다. 종료할 때도 쓰지 못하면 `POST /api/sessions/:id/stop`이 500을 내고 세션은 녹음 중으로 남으며, DB가 돌아온 뒤 다시 종료하면 저장됩니다. 서버를 끌 때까지 쓰지 못한 세그먼트는 잃습니다.
+녹음 중에 DB에 닿지 못하면 그동안의 final은 서버 메모리에 쌓였다가, DB가 돌아온 뒤 다음 final이 올 때나 종료할 때 순서대로 저장됩니다. 종료할 때도 쓰지 못하면 `POST /api/sessions/:id/stop`이 503을 내고 세션은 녹음 중으로 남으며, DB가 돌아온 뒤 다시 종료하면 저장됩니다. 서버를 끌 때까지 쓰지 못한 세그먼트는 잃습니다.
 
 ## STT 이벤트
 
