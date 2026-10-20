@@ -1,9 +1,157 @@
-// 녹음 화면 ('/'). 녹음 제어(T13)와 실시간 자막(T14)이 들어갈 자리다.
+// 녹음 화면 ('/'). 진행 중인 녹음의 상태를 보여 주고, 웹에서도 녹음을 시작·종료할 수 있게 한다.
+// 녹음의 주 제어는 기기의 물리 버튼이고, 이 화면의 버튼은 개발·시연·원격 종료용 보조 수단이다.
+// 화면을 연 뒤 물리 버튼으로 시작한 녹음은 새로고침해야 보인다. 알아채는 방법은 D4 협의 뒤에 정한다.
+// 실시간 자막(T14)은 이 화면 아래에 더한다.
+import type { Session } from '@app/shared';
+import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { type ApiError, toApiError } from '../api/client';
+import { getActiveSession, startSession, stopSession } from '../api/endpoints';
+
+// 화면의 상태. starting과 stopping은 요청을 보내고 답을 기다리는 동안이다.
+type Phase =
+  | { kind: 'checking' }
+  | { kind: 'check-failed'; error: ApiError }
+  | { kind: 'idle' }
+  | { kind: 'starting' }
+  | { kind: 'recording'; session: Session }
+  | { kind: 'stopping'; session: Session };
+
+// 밀리초를 mm:ss로, 한 시간이 넘으면 h:mm:ss로 바꾼다.
+function formatElapsed(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const seconds = String(total % 60).padStart(2, '0');
+  return hours > 0 ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`;
+}
+
+// 녹음을 시작한 뒤 흐른 시간. 1초마다 다시 그린다.
+// 시작 시각은 서버 시계, 지금 시각은 브라우저 시계라 두 시계가 다르면 어긋난다. 음수는 0으로 보인다.
+function ElapsedTime({ startedAt }: { startedAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <>{formatElapsed(now - Date.parse(startedAt))}</>;
+}
+
 export function RecordPage() {
+  const navigate = useNavigate();
+  const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
+  // 시작·종료가 실패했거나 예상과 다른 상태를 만났을 때 버튼 아래에 보여 줄 문구.
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // 서버에 진행 중인 녹음이 있는지 확인한다. 화면을 열 때와, 시작·종료가 409로 실패했을 때 부른다.
+  const checkActive = useCallback(async (signal?: AbortSignal) => {
+    setPhase({ kind: 'checking' });
+    try {
+      const session = await getActiveSession(signal);
+      setPhase(session ? { kind: 'recording', session } : { kind: 'idle' });
+    } catch (error) {
+      if (signal?.aborted) return;
+      setPhase({ kind: 'check-failed', error: toApiError(error) });
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void checkActive(controller.signal);
+    return () => controller.abort();
+  }, [checkActive]);
+
+  async function handleStart() {
+    setNotice(null);
+    setPhase({ kind: 'starting' });
+    try {
+      setPhase({ kind: 'recording', session: await startSession() });
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (apiError.code === 'SESSION_ALREADY_ACTIVE') {
+        // 다른 탭이나 기기 버튼으로 이미 시작한 녹음이 있다. 그 녹음을 보여 준다.
+        setNotice('이미 진행 중인 녹음이 있어 그 녹음을 보여 줍니다');
+        await checkActive();
+        return;
+      }
+      setNotice(`녹음을 시작하지 못했습니다: ${apiError.message}`);
+      setPhase({ kind: 'idle' });
+    }
+  }
+
+  async function handleStop(session: Session) {
+    setNotice(null);
+    setPhase({ kind: 'stopping', session });
+    try {
+      const ended = await stopSession(session.id);
+      // 종료하면 저장된 문장을 볼 수 있는 히스토리 상세로 간다.
+      navigate(`/history/${ended.id}`);
+    } catch (error) {
+      const apiError = toApiError(error);
+      if (apiError.code === 'SESSION_NOT_ACTIVE' || apiError.code === 'SESSION_NOT_FOUND') {
+        // 다른 탭이나 기기 버튼으로 이미 끝난 녹음이다. 지금 상태를 다시 확인한다.
+        setNotice(`이미 끝난 녹음입니다 (#${session.id})`);
+        await checkActive();
+        return;
+      }
+      // 서버는 종료에 실패하면 세션을 녹음 중으로 남긴다. 다시 누르면 종료를 다시 요청한다.
+      setNotice(`녹음을 종료하지 못했습니다: ${apiError.message}. 잠시 뒤 다시 종료해 주세요`);
+      setPhase({ kind: 'recording', session });
+    }
+  }
+
   return (
     <section>
       <h1>녹음</h1>
-      <p>녹음 제어(T13)와 실시간 자막(T14)이 들어갈 자리입니다.</p>
+
+      {phase.kind === 'checking' && <p>녹음 상태를 확인하는 중…</p>}
+
+      {phase.kind === 'check-failed' && (
+        <>
+          <p role="alert">녹음 상태를 확인하지 못했습니다: {phase.error.message}</p>
+          <button type="button" onClick={() => void checkActive()}>
+            다시 확인
+          </button>
+        </>
+      )}
+
+      {(phase.kind === 'idle' || phase.kind === 'starting') && (
+        <>
+          <p role="status">{phase.kind === 'starting' ? '시작하는 중…' : '녹음하고 있지 않습니다'}</p>
+          <button
+            type="button"
+            disabled={phase.kind === 'starting'}
+            onClick={() => void handleStart()}
+          >
+            녹음 시작
+          </button>
+        </>
+      )}
+
+      {(phase.kind === 'recording' || phase.kind === 'stopping') && (
+        <>
+          <p role="status">
+            {phase.kind === 'stopping' ? '종료하는 중…' : '녹음 중'} ·{' '}
+            <ElapsedTime startedAt={phase.session.startedAt} /> (#{phase.session.id})
+          </p>
+          <button
+            type="button"
+            disabled={phase.kind === 'stopping'}
+            onClick={() => void handleStop(phase.session)}
+          >
+            녹음 종료
+          </button>
+        </>
+      )}
+
+      {notice && <p role="alert">{notice}</p>}
+
+      <p>
+        <small>
+          녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다. 기기 버튼으로 시작한
+          녹음이 보이지 않으면 새로고침해 주세요.
+        </small>
+      </p>
     </section>
   );
 }

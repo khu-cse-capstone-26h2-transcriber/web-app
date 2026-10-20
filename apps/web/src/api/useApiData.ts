@@ -1,6 +1,6 @@
 // 화면에서 API 하나를 불러 상태로 쓰는 훅. deps가 바뀌거나 화면을 떠나면 이전 요청을 취소한다.
 import { type DependencyList, useEffect, useState } from 'react';
-import { ApiError } from './client';
+import { type ApiError, toApiError } from './client';
 
 export type ApiState<T> =
   | { status: 'loading' }
@@ -22,10 +22,7 @@ export function useApiData<T>(
       },
       (error: unknown) => {
         if (controller.signal.aborted) return;
-        // request는 ApiError만 던진다. 그 밖의 에러는 화면 코드의 버그다.
-        const apiError =
-          error instanceof ApiError ? error : new ApiError(0, 'CLIENT_ERROR', String(error));
-        setState({ status: 'error', error: apiError });
+        setState({ status: 'error', error: toApiError(error) });
       },
     );
     return () => controller.abort();

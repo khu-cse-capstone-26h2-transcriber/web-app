@@ -1,5 +1,6 @@
 // API 에러 응답 형식과 공통 에러 처리. 모든 에러 응답은 { error: { code, message } } 모양이다.
 import type { ErrorRequestHandler, RequestHandler } from 'express';
+import { isDbUnavailable } from '../db/errors';
 
 // 핸들러에서 던지면 errorHandler가 status와 code를 그대로 응답으로 바꾼다.
 export class HttpError extends Error {
@@ -32,6 +33,14 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     res.status(400).json({
       error: { code: 'INVALID_JSON', message: '요청 본문이 올바른 JSON이 아닙니다' },
     });
+    return;
+  }
+
+  // DB에 닿지 못했다. /health와 같은 503으로 답해, 웹앱이 잠시 뒤 다시 시도하라고 알릴 수 있게 한다.
+  if (isDbUnavailable(error)) {
+    const { message, code } = error as { message?: string; code?: string };
+    console.error(`[server] DB에 연결하지 못했습니다: ${message || code || 'unknown'}`);
+    res.status(503).json({ error: { code: 'DB_UNAVAILABLE', message: 'DB에 연결하지 못했습니다' } });
     return;
   }
 

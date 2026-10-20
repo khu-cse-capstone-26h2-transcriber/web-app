@@ -1,4 +1,4 @@
-// 서버 API 함수. 타입은 @app/shared를 쓴다. 녹음 시작·종료(T13)와 스트림(T14)은 그 작업에서 더한다.
+// 서버 API 함수. 타입은 @app/shared를 쓴다. 스트림(T14)은 그 작업에서 더한다.
 import type { Segment, Session, SessionSummary } from '@app/shared';
 import { request } from './client';
 
@@ -15,6 +15,25 @@ export interface SessionDetail {
 
 export function getHealth(signal?: AbortSignal): Promise<Health> {
   return request<Health>('/health', { signal });
+}
+
+// 진행 중인 세션. 없으면 null. 서버 메모리만 읽으므로 DB가 꺼져 있어도 답한다.
+export async function getActiveSession(signal?: AbortSignal): Promise<Session | null> {
+  const body = await request<{ session: Session | null }>('/api/sessions/active', { signal });
+  return body.session;
+}
+
+// 녹음을 시작한다. 이미 진행 중인 세션이 있으면 409 SESSION_ALREADY_ACTIVE.
+export async function startSession(): Promise<Session> {
+  const body = await request<{ session: Session }>('/api/sessions', { method: 'POST' });
+  return body.session;
+}
+
+// 녹음을 종료한다. 진행 중이 아니면 409 SESSION_NOT_ACTIVE, DB에 닿지 못하면 503 DB_UNAVAILABLE.
+// 서버는 종료에 실패하면 세션을 녹음 중으로 남기므로, 같은 번호로 다시 부르면 된다.
+export async function stopSession(id: number): Promise<Session> {
+  const body = await request<{ session: Session }>(`/api/sessions/${id}/stop`, { method: 'POST' });
+  return body.session;
 }
 
 // 히스토리 목록. 끝난 세션 중 세그먼트가 있는 것만, 최근 것부터.

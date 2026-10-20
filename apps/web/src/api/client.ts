@@ -19,6 +19,11 @@ export class ApiError extends Error {
   }
 }
 
+// 잡은 에러를 ApiError로 맞춘다. request는 ApiError만 던지므로, 그 밖의 에러는 화면 코드의 버그다.
+export function toApiError(error: unknown): ApiError {
+  return error instanceof ApiError ? error : new ApiError(0, 'CLIENT_ERROR', String(error));
+}
+
 function isErrorBody(value: unknown): value is ErrorBody {
   const error = (value as { error?: unknown } | null)?.error as
     | { code?: unknown; message?: unknown }
