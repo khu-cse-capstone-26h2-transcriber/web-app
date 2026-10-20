@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-19
+마지막 갱신: 2026-10-20
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -125,8 +125,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 결정 | 내용 | 협의 파트(상대) | 막는 작업 | 늦어도 필요한 시점 |
 | --- | --- | --- | --- | --- |
-| D4 | STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식 | [AI](박지윤), [하드웨어](김범수) | T19, T20 | T05 완료 직후 |
-| D5 | Rubik Pi OS, 입출력(마이크 등), 기기 수령 시점 | [하드웨어](김범수) | T21 | T18 완료 전 |
+| D4 | STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식. 2026-10-17 종합본(1차 멘토링 자료)에서 일부 답: 마이크는 `audiostackd`가 읽음, partial 지원, 구간은 6초 이후 단어 사이·최대 10초. 남은 쟁점: 결과 전달 방향(데몬이 백엔드로 HTTP POST 중), 세션 ID 발급과 시작·종료 주체, `seq`와 `segmentId`, STT 주소. 상세는 `docs/d4-stt-questions.md` 답 칸 | [AI](박지윤), [하드웨어](김범수) | T19, T20 | T05 완료 직후 |
+| D5 | 입출력(마이크 등), 기기 수령 시점. OS는 Ubuntu for Qualcomm으로 확정(2026-10-17 하드웨어 파트 문서), 마이크는 3.5 mm 포트 계획 | [하드웨어](김범수) | T21 | T18 완료 전 |
 | D7 | 팀 전체 마일스톤과 주차별 일정 | [AI], [하드웨어] 모두 | 우선순위 재조정 | 가능한 빨리 |
 | D8 | PostgreSQL 메모리 설정, SQLite 전환 여부 | [하드웨어](김범수), 실측 후 | T21 이후 | T21 완료 후 |
 
@@ -136,6 +136,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-20 | 1차 멘토링 자료 정리 | 완료 | 2026-10-18 1차 멘토링 종합본(10-17 작성, 세 파트 진행 현황)에서 확정 사안과 D4 답을 정리. D4·D5 행, 로컬 `CLAUDE.md`의 미정 목록(OS 확정), `docs/d4-stt-questions.md` 답 칸, `docs/project-overview.md`의 기술 결정 표(기기 OS 행)와 D5 줄 갱신. 코드 변경 없음 | 종합본에 멘토 피드백·회의 결론은 없음. D4 핵심 쟁점(결과 전달 방향, 세션 ID 발급과 시작·종료 주체, `seq`와 `segmentId`) 남음 | T13, T14 (D4 협의) |
 | 2026-10-19 | T12 | 완료 | 브랜치 `feat/t12-web-skeleton`에서 Vite 8.3.4·React 19.3.1·React Router 7.18.4 설치, `vite.config.ts`(루트 `.env`의 `PORT`로 `/api`·`/health` 프록시), `api/client.ts`(`ApiError`)·`endpoints.ts`·`useApiData.ts`, `Layout.tsx`(메뉴, 서버 상태), 화면 `/`·`/history`·`/history/:id`·없는 주소, 루트 `dev:web`, 지침서 `T12.md` 작성. 완료 기준 21개 통과(브라우저 확인, 프록시를 거친 SSE 포함). 사용자 확정(D3 포함): Vite, React Router, Vite 프록시(CORS 없음), `fetch` 래퍼. 지침서 없이 정한 것: React Router 8.x는 Node 22.22 이상이라 7.x, npm 10 버그로 Vite만 `--legacy-peer-deps`로 설치(`npm ci`는 옵션 없이 통과), 데이터는 loader 대신 훅, 프록시 502는 `NETWORK_ERROR`, 응답을 감싸는 타입은 웹에 둠. `main`에 병합하고 push(2026-10-19) | 기기에서 빌드 결과를 누가 내보낼지(D5와 함께). 로컬 DB에 확인용 세션 29개, 세그먼트 191행 | T13, T14 (T13 전 DB 꺼짐 시 500/503 결정. T11은 D6 결정 필요) |
 | 2026-10-16 | T09 | 완료 | 브랜치 `feat/t09-sse-resume`에서 `http/sse.ts`(`id:` 줄), `sessions/manager.ts`(진행 중인 세션의 final 목록, `subscribe`에서 먼저 보내기), `sessions/routes.ts`(`Last-Event-ID` 읽기, final에 `segmentId`를 `id`로), `shared/src/stream.ts`(규칙 주석) 수정, 지침서 `T09.md` 작성, T07 지침서에 바뀐 결정 덧붙임. 접속하면 지금까지의 final을 먼저 보내고, `Last-Event-ID`가 있으면 그 번호 뒤의 것만 보냄. 완료 기준 19개 통과(브라우저 `EventSource` 재접속 포함). 사용자 확정: final에만 `segmentId`로 `id`, 헤더가 없으면 처음부터(T07 결정 변경), 메모리에서 다시 보냄, 끝난 세션은 `409` 그대로. 지침서 없이 정한 것: heartbeat·`ended`에는 `id` 없음, 잘못된 헤더 `400`, 말하던 중이던 partial은 다시 보내지 않음, final 목록 상한 없음. `main`에 병합하고 push(2026-10-16) | `id`는 `segmentId`가 0부터 늘어난다는 D4 초안에 기댐 [AI]. `retry:`와 `409`일 때 상세 API로 채우기는 T15. final 목록 메모리는 T21. 로컬 DB에 확인용 세션 28개, 세그먼트 189행 | T11은 D6, T12는 D3 결정 필요 (결정 없이 시작할 수 있는 P0·P1 없음) |
 | 2026-10-15 | T10 | 완료 | 브랜치 `feat/t10-history-api`에서 공용 `Segment`(`shared/src/segment.ts`)·`SessionSummary` 타입, `listFinishedSessions`(`sessions/repository.ts`)·`listSegments`(`segments/repository.ts`), 라우트 `GET /api/sessions`(목록)·`GET /api/sessions/:id`(상세) 추가, 지침서 `T10.md` 작성. 목록은 끝난 세션 중 세그먼트가 있는 것만 최신순 전부, 항목마다 `segmentCount`와 첫 문장 `preview`. 상세는 어느 세션이든 세션과 세그먼트 전체. 완료 기준 18개 통과(psql 비교 포함). 사용자 확정: 세션 아래 주소, 요약 포함, 전부·최신순, 끝난 것만. 지침서 없이 정한 것: 미리보기는 자르지 않음, 녹음 중 세션의 상세는 DB에 저장된 것만, 녹음 길이는 응답에 넣지 않음. `main`에 병합하고 push(2026-10-15) | 강제로 꺼진 세션의 `ended_at` 보정(T16 전, T06에서 넘어옴). 세그먼트 없는 세션은 DB에 남음. T11은 D6 결정 필요. 로컬 DB에 확인용 세션 22개, 세그먼트 105행 | T09 (T11은 D6, T12는 D3 결정 필요) |
