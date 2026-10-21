@@ -1,12 +1,14 @@
 // 녹음 화면 ('/'). 진행 중인 녹음의 상태를 보여 주고, 웹에서도 녹음을 시작·종료할 수 있게 한다.
 // 녹음의 주 제어는 기기의 물리 버튼이고, 이 화면의 버튼은 개발·시연·원격 종료용 보조 수단이다.
 // 화면을 연 뒤 물리 버튼으로 시작한 녹음은 새로고침해야 보인다. 알아채는 방법은 D4 협의 뒤에 정한다.
-// 실시간 자막(T14)은 이 화면 아래에 더한다.
+// 녹음 중에는 버튼 아래에 실시간 자막(T14)을 보인다. 어디서 끝냈든 녹음이 끝나면 히스토리 상세로 간다.
 import type { Session } from '@app/shared';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { type ApiError, toApiError } from '../api/client';
 import { getActiveSession, startSession, stopSession } from '../api/endpoints';
+import { useSessionStream } from '../api/useSessionStream';
+import { Transcript } from '../components/Transcript';
 
 // 화면의 상태. starting과 stopping은 요청을 보내고 답을 기다리는 동안이다.
 type Phase =
@@ -42,6 +44,21 @@ export function RecordPage() {
   const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
   // 시작·종료가 실패했거나 예상과 다른 상태를 만났을 때 버튼 아래에 보여 줄 문구.
   const [notice, setNotice] = useState<string | null>(null);
+
+  // 웹 버튼으로 끝내면 종료 응답과 스트림의 ended가 둘 다 온다. 먼저 온 쪽에서 한 번만 이동한다.
+  const leftRef = useRef(false);
+  const goToHistory = useCallback(
+    (session: Session) => {
+      if (leftRef.current) return;
+      leftRef.current = true;
+      navigate(`/history/${session.id}`);
+    },
+    [navigate],
+  );
+
+  const streamSessionId =
+    phase.kind === 'recording' || phase.kind === 'stopping' ? phase.session.id : null;
+  const transcript = useSessionStream(streamSessionId, goToHistory);
 
   // 서버에 진행 중인 녹음이 있는지 확인한다. 화면을 열 때와, 시작·종료가 409로 실패했을 때 부른다.
   const checkActive = useCallback(async (signal?: AbortSignal) => {
@@ -83,9 +100,8 @@ export function RecordPage() {
     setNotice(null);
     setPhase({ kind: 'stopping', session });
     try {
-      const ended = await stopSession(session.id);
       // 종료하면 저장된 문장을 볼 수 있는 히스토리 상세로 간다.
-      navigate(`/history/${ended.id}`);
+      goToHistory(await stopSession(session.id));
     } catch (error) {
       const apiError = toApiError(error);
       if (apiError.code === 'SESSION_NOT_ACTIVE' || apiError.code === 'SESSION_NOT_FOUND') {
@@ -145,6 +161,8 @@ export function RecordPage() {
       )}
 
       {notice && <p role="alert">{notice}</p>}
+
+      {streamSessionId !== null && <Transcript {...transcript} />}
 
       <p>
         <small>

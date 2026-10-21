@@ -1,4 +1,4 @@
-// 서버 API 함수. 타입은 @app/shared를 쓴다. 스트림(T14)은 그 작업에서 더한다.
+// 서버 API 함수. 타입은 @app/shared를 쓴다. 세션 스트림(SSE)은 useSessionStream.ts에 있다.
 import type { Segment, Session, SessionSummary } from '@app/shared';
 import { request } from './client';
 
