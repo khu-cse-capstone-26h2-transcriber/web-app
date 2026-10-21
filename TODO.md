@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-20
+마지막 갱신: 2026-10-21
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -136,6 +136,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | T14 | 진행 중 | 브랜치 `feat/t14-live-transcript`에서 `useSessionStream.ts`(`EventSource` 구독, final은 `segmentId`로 덮어쓰기, `ended`면 `onEnded`)·`Transcript.tsx`(final 목록, 흐린 partial 한 줄, 바닥에 있을 때만 자동 스크롤)·`RecordPage.tsx`(버튼 아래 자막, 종료 응답과 `ended` 중 먼저 온 쪽에서 한 번만 히스토리 상세로) 작성. 브라우저 확인(시작, 새로고침, 밖에서 종료, 웹 버튼 종료). 사용자 확정: 녹음 화면 아래, `ended`면 히스토리 상세, partial은 흐린 한 줄 | 지침서 `T14.md`, overview 갱신, `main` 병합. `409`일 때 스트림이 닫힌 채 남음(T15). 로컬 DB에 확인용 세션 #38·#39 추가 | T14 마무리, T15 |
 | 2026-10-20 | T13 | 완료 | 브랜치 `feat/t13-record-control`에서 서버 `db/errors.ts`(`isDbUnavailable`)·`http/errors.ts`(DB에 닿지 못하면 `503 DB_UNAVAILABLE`), 웹 `endpoints.ts`(세션 API 3개)·`client.ts`(`toApiError`)·`RecordPage.tsx`(녹음 상태, 흐른 시간, 보조 시작·종료 버튼, 409·503 문구, 종료하면 히스토리 상세로), 지침서 `T13.md` 작성. 완료 기준 23개 통과(브라우저 확인 포함). 사용자 확정: 503, 열 때 진행 중인 녹음 확인, 웹 버튼은 보조(주 제어는 물리 버튼), 다른 곳에서 시작한 녹음 감지는 D4 뒤, 종료 후 히스토리 상세. 지침서 없이 정한 것: DB 연결 실패를 에러 코드·메시지로 판정, `toApiError`를 client로 옮김, 에러 코드는 문자열 비교, 흐른 시간은 브라우저 시계. `main`에 병합하고 push(2026-10-20) | 물리 버튼 신호 경로와 외부 시작 감지 [하드웨어](D4). 물리 버튼 종료 때 이동 여부(T14), 기기 시계(D5), 쿼리 시간 제한(T21). 로컬 DB에 확인용 세션 33개, 세그먼트 235행 | T14 |
 | 2026-10-20 | 1차 멘토링 자료 정리 | 완료 | 2026-10-18 1차 멘토링 종합본(10-17 작성, 세 파트 진행 현황)에서 확정 사안과 D4 답을 정리. D4·D5 행, 로컬 `CLAUDE.md`의 미정 목록(OS 확정), `docs/d4-stt-questions.md` 답 칸, `docs/project-overview.md`의 기술 결정 표(기기 OS 행)와 D5 줄 갱신. 코드 변경 없음. 브랜치 `docs/mentoring-1-summary`에서 커밋하고 `main`에 병합한 뒤 push(2026-10-20) | 종합본에 멘토 피드백·회의 결론은 없음. D4 핵심 쟁점(결과 전달 방향, 세션 ID 발급과 시작·종료 주체, `seq`와 `segmentId`) 남음 | T13, T14 (D4 협의) |
 | 2026-10-19 | T12 | 완료 | 브랜치 `feat/t12-web-skeleton`에서 Vite 8.3.4·React 19.3.1·React Router 7.18.4 설치, `vite.config.ts`(루트 `.env`의 `PORT`로 `/api`·`/health` 프록시), `api/client.ts`(`ApiError`)·`endpoints.ts`·`useApiData.ts`, `Layout.tsx`(메뉴, 서버 상태), 화면 `/`·`/history`·`/history/:id`·없는 주소, 루트 `dev:web`, 지침서 `T12.md` 작성. 완료 기준 21개 통과(브라우저 확인, 프록시를 거친 SSE 포함). 사용자 확정(D3 포함): Vite, React Router, Vite 프록시(CORS 없음), `fetch` 래퍼. 지침서 없이 정한 것: React Router 8.x는 Node 22.22 이상이라 7.x, npm 10 버그로 Vite만 `--legacy-peer-deps`로 설치(`npm ci`는 옵션 없이 통과), 데이터는 loader 대신 훅, 프록시 502는 `NETWORK_ERROR`, 응답을 감싸는 타입은 웹에 둠. `main`에 병합하고 push(2026-10-19) | 기기에서 빌드 결과를 누가 내보낼지(D5와 함께). 로컬 DB에 확인용 세션 29개, 세그먼트 191행 | T13, T14 (T13 전 DB 꺼짐 시 500/503 결정. T11은 D6 결정 필요) |
