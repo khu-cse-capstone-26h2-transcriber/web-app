@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-10-27
+마지막 갱신: 2026-10-28
 
 ## 오늘의 작업 (2026-10-12) — T02 로컬 PostgreSQL(docker-compose)과 환경변수 로더
 
@@ -104,7 +104,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 - [x] T10 히스토리 API(목록, 상세) — P1 · 단계 6 · 선행: T08 · 협의: 없음
 - [x] T11 히스토리 내보내기 API — P1 · 단계 7 · 선행: T10 · 협의: 없음 · D6: txt·md(2026-10-27 확정)
-- [ ] T16 히스토리 화면과 다운로드 버튼 — P1 · 단계 8 · 선행: T10, T11, T12 · 협의: 없음
+- [x] T16 히스토리 화면과 다운로드 버튼 — P1 · 단계 8 · 선행: T10, T11, T12 · 협의: 없음
 
 ### 검증
 
@@ -136,6 +136,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | T16 | 완료 | 브랜치 `feat/t16-history-screen`에서 공용 표시 함수 `shared/src/format.ts`(`SESSION_STATUS_LABELS`, `formatStartedAt`, `formatOffset`, `formatDuration`, `recordingLengthMs`. 서버 `export/format.ts`에서 옮김), 웹 `client.ts`(`requestFile`, `send`·`responseError`로 묶음)·`endpoints.ts`(`exportSession`)·`DownloadButtons.tsx`·`HistoryListPage.tsx`·`HistoryDetailPage.tsx`, 지침서 `T16.md`(구현 전 작성). 완료 기준 통과(내보내기 74개 바이트 비교, 목록·상세가 psql·txt와 같음, Playwright로 실제 저장, DB 꺼짐·서버 꺼짐 문구, 녹음 중 세션). 사용자 확정: `fetch`로 받아 저장, 표시 함수 shared로, 목록에 길이 없음, 상세는 문장별 시각. 지침서와 다른 점: 앱 브라우저 창이 파일을 저장하지 않아 실제 저장은 Playwright로 확인 | `409` 화면 문구는 버튼을 막아 확인 못 함. Safari 저장 미확인. 로컬 DB에 확인용 세션 #47 추가(`sessions` 43행, `segments` 583행). `main` 병합과 push 안 함 | T17 또는 T18 (T18은 선행 작업이 모두 끝남) |
 | 2026-10-27 | T11 | 완료 | 브랜치 `feat/t11-history-export`에서 공용 `ExportFormat`·`EXPORT_FORMATS`(`shared/src/export.ts`), 포매터 `export/format.ts`(txt·md, 순수 함수), 라우트 `GET /api/sessions/:id/export?format=txt\|md`(`routes.ts`, 404를 `requireSession`으로 묶음), 지침서 `T11.md`(구현 전 작성). 완료 기준 통과(curl로 헤더·본문·psql 비교, interrupted, 문장 없음, 409·400·404·503, Vite 프록시, 1시간 넘는 값). 사용자 확정: D6 txt·md 둘 다, 머리말 아래 문장별 시작 시각, 한국 시간 고정, 길이는 마지막 문장 끝 시각(`ended_at` 보정의 답), 녹음 중이면 409. 지침서와 다른 점: `Content-Disposition` 파일 이름에 따옴표 없음(Express 동작). `main`에 병합하고 push(2026-10-27) | 브라우저 저장 확인과 `formatDuration` 공유 여부는 T16. 기기 Node의 시간대 데이터는 T21. 로컬 DB에 확인용 세션 #46 추가(`sessions` 42행, `segments` 579행) | T16 (T17도 시작 가능) |
 | 2026-10-23 | T15 | 완료 | 브랜치 `feat/t15-sse-reconnect`에서 `useSessionStream.ts`(직접 다시 연결: `error`나 30초 무소식이면 닫고 1·2·4·8·10초 간격으로 `GET /api/sessions/active`를 확인해 같은 세션이면 새로 열고, 끊긴 사이에 끝났으면 히스토리 상세로), `ConnectionBanner.tsx`(녹음 화면 맨 위, '지금 다시 연결', 회복 문구 3초), `useServerHealth.ts`·`Layout.tsx`(서버 상태를 30초마다와 다시 연결될 때 확인, `Outlet` context), `RecordPage.tsx` 수정, 지침서 `T15.md`(구현 전 작성). 완료 기준 통과(브라우저: preview 끄고 켜기, 서버 `SIGSTOP`·`SIGCONT`, 끊긴 사이 종료, 서버 재시작 `interrupted`, psql과 같음). 사용자 확정: 직접 다시 연결, 끊긴 사이에 끝나면 히스토리 상세, 서버 상태 다시 확인 포함, 기본값(30초 판정, 간격, 배너 문구). 구현하면서 정한 것: 세션 확인 5초 시간 제한, 처음 접속 실패도 끊김으로 처리. `main`에 병합하고 push(2026-10-23) | 프록시 502에서 `EventSource`가 멈춰 T14 문서의 '계속 다시 접속'이 틀렸음(overview 고침). 끊긴 사이 기기 버튼으로 시작한 새 녹음은 D4 뒤 [하드웨어]. 로컬 DB에 확인용 세션 #42~#45 추가(`sessions` 41행, `segments` 577행) | D6을 정하면 T11 (결정 없이 시작할 수 있는 P0·P1 없음) |
 | 2026-10-22 | T14 | 완료 | 완료 기준 재확인(typecheck, 빌드, 브라우저: #40 시작·자동 스크롤·새로고침·밖에서 종료 72개, #41 웹 버튼 종료 13개, psql과 같음, 콘솔 에러 없음). 지침서 `T14.md` 작성(구현 뒤 작성, 사용자 결정 4개, 구현하면서 정한 것 6개, 완료 기준 15개), `project-overview`의 구성 요소 표·폴더 구조·'웹앱' 절·'실시간 스트림' 절 갱신. 다른 워크트리의 파일을 고칠 수 없어 T14 커밋을 `claude/elastic-cohen-4120f0`로 fast-forward해 그 위에서 문서를 쓰고, `main`을 fast-forward로 병합하고 push(2026-10-22) | `409`로 스트림이 멈춘 채 남고 서버가 꺼져도 표시가 없음(T15). 로컬 DB에 확인용 세션 #40·#41 추가(`sessions` 37행, `segments` 431행) | T15 (T11은 D6 결정 필요) |
