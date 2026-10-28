@@ -31,29 +31,66 @@ function isErrorBody(value: unknown): value is ErrorBody {
   return typeof error?.code === 'string' && typeof error.message === 'string';
 }
 
-// JSON 응답을 T로 돌려준다. 실패는 모두 ApiError로 던지고, 취소(signal)만 원래 에러 그대로 던진다.
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let response: Response;
+function networkError(): ApiError {
+  return new ApiError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다');
+}
+
+// fetch를 부른다. 서버에 닿지 못하면 ApiError로 던지고, 취소(signal)는 원래 에러 그대로 던진다.
+async function send(path: string, init: RequestInit): Promise<Response> {
   try {
-    response = await fetch(path, init);
+    return await fetch(path, init);
   } catch (error) {
     if (init.signal?.aborted) throw error;
-    throw new ApiError(0, 'NETWORK_ERROR', '서버에 연결하지 못했습니다');
+    throw networkError();
   }
+}
 
+// 실패한 응답을 ApiError로 바꾼다. body는 JSON으로 읽은 본문이고, JSON이 아니면 undefined다.
+function responseError(status: number, body: unknown): ApiError {
+  if (isErrorBody(body)) return new ApiError(status, body.error.code, body.error.message);
+  // 개발 중 Express가 꺼져 있으면 Vite 프록시가 JSON 없이 502로 답한다. 서버에 닿지 못한 것과 같게 다룬다.
+  if (status === 502) return new ApiError(502, 'NETWORK_ERROR', '서버에 연결하지 못했습니다');
+  return new ApiError(status, 'UNEXPECTED_RESPONSE', `서버 응답을 읽지 못했습니다 (HTTP ${status})`);
+}
+
+// JSON 응답을 T로 돌려준다. 실패는 모두 ApiError로 던지고, 취소(signal)만 원래 에러 그대로 던진다.
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await send(path, init);
   // 서버는 성공과 에러 모두 JSON으로 답한다. JSON이 아니면 서버가 아닌 곳(프록시 등)의 응답이다.
   const body: unknown = await response.json().catch(() => undefined);
   if (response.ok && body !== undefined) return body as T;
-  if (isErrorBody(body)) {
-    throw new ApiError(response.status, body.error.code, body.error.message);
+  throw responseError(response.status, body);
+}
+
+// 내려받은 파일 하나.
+export interface DownloadedFile {
+  filename: string;
+  blob: Blob;
+}
+
+// Content-Disposition의 filename을 읽는다. 서버는 영문 이름에 따옴표를 붙이지 않지만, 붙여도 읽는다.
+function filenameFrom(disposition: string | null): string | undefined {
+  return disposition?.match(/filename="?([^";]+)"?/i)?.[1];
+}
+
+// 파일 응답(Content-Disposition: attachment)을 받는다. 실패는 request와 같은 ApiError로 던진다.
+// 파일 이름은 서버가 정하고, 헤더가 없을 때만 fallbackName을 쓴다.
+export async function requestFile(
+  path: string,
+  fallbackName: string,
+  init: RequestInit = {},
+): Promise<DownloadedFile> {
+  const response = await send(path, init);
+  if (!response.ok) {
+    throw responseError(response.status, await response.json().catch(() => undefined));
   }
-  // 개발 중 Express가 꺼져 있으면 Vite 프록시가 JSON 없이 502로 답한다. 서버에 닿지 못한 것과 같게 다룬다.
-  if (response.status === 502) {
-    throw new ApiError(502, 'NETWORK_ERROR', '서버에 연결하지 못했습니다');
+  let blob: Blob;
+  try {
+    blob = await response.blob();
+  } catch (error) {
+    if (init.signal?.aborted) throw error;
+    // 본문을 받는 중에 연결이 끊겼다.
+    throw networkError();
   }
-  throw new ApiError(
-    response.status,
-    'UNEXPECTED_RESPONSE',
-    `서버 응답을 읽지 못했습니다 (HTTP ${response.status})`,
-  );
+  return { filename: filenameFrom(response.headers.get('Content-Disposition')) ?? fallbackName, blob };
 }

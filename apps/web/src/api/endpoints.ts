@@ -1,6 +1,6 @@
 // 서버 API 함수. 타입은 @app/shared를 쓴다. 세션 스트림(SSE)은 useSessionStream.ts에 있다.
-import type { Segment, Session, SessionSummary } from '@app/shared';
-import { request } from './client';
+import type { ExportFormat, Segment, Session, SessionSummary } from '@app/shared';
+import { type DownloadedFile, request, requestFile } from './client';
 
 // GET /health의 성공 응답. DB가 꺼져 있으면 503 DB_UNAVAILABLE로 실패한다.
 export interface Health {
@@ -45,4 +45,9 @@ export async function listSessions(signal?: AbortSignal): Promise<SessionSummary
 // 히스토리 상세. id는 주소에서 읽은 그대로 보내고, 형식 검사는 서버가 한다(400 INVALID_SESSION_ID).
 export function getSession(id: string, signal?: AbortSignal): Promise<SessionDetail> {
   return request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`, { signal });
+}
+
+// 히스토리 내보내기. 끝난 세션을 txt나 md 파일로 받는다. 녹음 중이면 409 SESSION_RECORDING.
+export function exportSession(id: number, format: ExportFormat): Promise<DownloadedFile> {
+  return requestFile(`/api/sessions/${id}/export?format=${format}`, `session-${id}.${format}`);
 }
