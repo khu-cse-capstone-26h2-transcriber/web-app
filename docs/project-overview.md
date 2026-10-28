@@ -44,7 +44,7 @@ flowchart LR
 | 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
-| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 화면은 예정 (T16) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS`, `ExportFormat`, `EXPORT_FORMATS` |
 
 ## 기술 결정
@@ -96,7 +96,7 @@ speech-transcriber/
 │  │     │  ├─ pool.ts        # pg 연결 풀
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
 │  │     ├─ export/
-│  │     │  └─ format.ts      # 히스토리 내보내기 포매터 (txt, md)
+│  │     │  └─ format.ts      # 히스토리 내보내기 포매터 (txt, md). 시각·길이·상태 표시는 shared의 format.ts
 │  │     ├─ http/
 │  │     │  ├─ errors.ts      # HttpError, 404·에러 처리 미들웨어
 │  │     │  └─ sse.ts         # SSE 응답 하나 (헤더, id 줄, data 한 줄 JSON, heartbeat)
@@ -120,13 +120,14 @@ speech-transcriber/
 │        ├─ main.tsx          # 진입점 (라우터를 #root에 붙임)
 │        ├─ router.tsx        # 화면 주소
 │        ├─ api/
-│        │  ├─ client.ts      # fetch 래퍼, ApiError
-│        │  ├─ endpoints.ts   # 서버 API 함수 (/health, 세션 시작·종료·진행 중, 히스토리 목록·상세)
+│        │  ├─ client.ts      # fetch 래퍼(JSON, 파일), ApiError
+│        │  ├─ endpoints.ts   # 서버 API 함수 (/health, 세션 시작·종료·진행 중, 히스토리 목록·상세·내보내기)
 │        │  ├─ useApiData.ts  # 화면에서 API 하나를 불러 쓰는 훅
 │        │  ├─ useServerHealth.ts   # /health를 30초마다 다시 확인하는 훅
 │        │  └─ useSessionStream.ts  # 세션 스트림(SSE)을 구독해 자막 상태로 쓰는 훅, 끊김 감지와 다시 연결
 │        ├─ components/
 │        │  ├─ ConnectionBanner.tsx # 자막 스트림 연결 배너 (끊김, 다시 연결됨)
+│        │  ├─ DownloadButtons.tsx  # 히스토리 상세의 txt·md 내려받기 버튼
 │        │  ├─ Layout.tsx     # 공통 틀 (메뉴, 서버 상태)
 │        │  └─ Transcript.tsx # 실시간 자막 (final 목록, 흐린 partial 한 줄, 자동 스크롤)
 │        └─ pages/            # 녹음, 히스토리 목록·상세, 없는 주소 화면
@@ -135,6 +136,7 @@ speech-transcriber/
 │     └─ src/
 │        ├─ index.ts
 │        ├─ export.ts         # ExportFormat 타입, EXPORT_FORMATS (내보내기 형식)
+│        ├─ format.ts         # 시작 시각, 문장 앞 시각, 녹음 길이, 상태 이름 (내보내기 파일과 히스토리 화면이 같이 씀)
 │        ├─ segment.ts        # Segment 타입 (저장된 세그먼트)
 │        ├─ session.ts        # Session, SessionSummary 타입
 │        ├─ stream.ts         # SessionStreamMessage 타입, heartbeat 간격
@@ -171,8 +173,8 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 | 주소 | 화면 | 상태 |
 | --- | --- | --- |
 | `/` | 녹음 | 녹음 상태와 보조 시작·종료 버튼 (T13), 녹음 중 실시간 자막 (T14) |
-| `/history` | 히스토리 목록 | 목록 API 결과를 그대로 보여 줌. 화면 구성은 T16 |
-| `/history/:id` | 히스토리 상세 | 상세 API로 상태, 시작 시각, 세그먼트 개수만 보여 줌. 본문과 다운로드는 T16 |
+| `/history` | 히스토리 목록 | 끝난 녹음을 최근 것부터, 누르면 상세로 (T16) |
+| `/history/:id` | 히스토리 상세 | 머리말(시작, 길이, 상태), txt·md 내려받기 버튼, 문장별 시각 (T16) |
 | 그 밖의 주소 | 페이지를 찾을 수 없음 | |
 
 모든 화면 위쪽에 메뉴와 서버 상태가 있습니다. 서버 상태는 `/health`를 불러 `정상`, `DB에 연결하지 못했습니다`, `서버에 연결하지 못했습니다` 중 하나로 보여 줍니다. 웹앱을 열 때, 그 뒤 30초마다, 녹음 화면의 자막 스트림이 다시 연결될 때 다시 확인하므로, 서버가 다시 켜지면 새로고침하지 않아도 `정상`으로 돌아옵니다(T15). 다시 확인하는 동안에는 직전 결과를 그대로 보여 줍니다.
@@ -214,6 +216,18 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 다시 연결을 `EventSource` 기본 동작에 맡기지 않는 이유는 '실시간 스트림' 절에 있습니다.
 
 화면을 연 뒤 다른 탭이나 기기 버튼으로 시작한 녹음은 새로고침하거나 버튼을 눌러 409를 받을 때 반영됩니다. 녹음 중에 밖에서 종료한 것은 스트림의 `ended`로 바로 반영됩니다. 바로 알아채는 방법(폴링 또는 알림 스트림)은 D4 협의 뒤에 정합니다. 흐른 시간은 서버의 시작 시각과 브라우저 시계로 계산하므로 두 시계가 다르면 어긋납니다.
+
+히스토리 화면(T16)은 지난 녹음을 보고 내려받는 곳입니다. 시작 시각, 길이, 상태, 문장 앞 시각은 내보내기 파일과 같은 함수(`packages/shared/src/format.ts`)로 써서, 화면과 내려받은 파일의 내용이 같습니다.
+
+| 화면 | 보이는 것 |
+| --- | --- |
+| 목록 | `지난 녹음 N개`와 항목. 첫 줄 `#45 · 2026-10-23 09:53 · 문장 7개`(서버가 꺼져 끊긴 세션은 끝에 `중단됨 (서버가 꺼져 끊김)`), 둘째 줄 첫 문장을 한 줄로 자름. 녹음이 없으면 `지난 녹음이 없습니다` |
+| 상세 | `시작 2026-10-23 09:53 · 길이 6초 · 종료됨`, 'txt 내려받기'·'md 내려받기' 버튼, `[00:03] 문장`을 한 줄씩. 문장이 없으면 `저장된 문장이 없습니다` |
+| 상세, 녹음 중인 세션 | 그때까지 저장된 문장. 버튼은 눌리지 않고 `녹음 중이라 아직 내려받을 수 없습니다`와 녹음 화면 링크. 주소로 직접 열 때만 생김 |
+| 내려받기 | 내보내기 API를 `fetch`로 받아 서버가 정한 이름(`session-45.txt`)으로 저장. 받는 동안 누른 버튼이 `받는 중…` |
+| 내려받기 실패 | `내려받지 못했습니다: DB에 연결하지 못했습니다`처럼 버튼 아래에 이유. 다시 누를 수 있음 |
+
+내려받기를 `<a href>` 링크로 하지 않는 이유는 실패했을 때 이유를 화면에 보이기 위해서입니다. 링크로 받으면 브라우저 다운로드 목록에 '실패'로만 남습니다.
 
 서버 API는 `src/api/endpoints.ts`의 함수로 부릅니다. 실패하면 서버가 보낸 `code`와 `message`를 담은 `ApiError`를 던지고, 서버에 닿지 못하면 `code`가 `NETWORK_ERROR`입니다.
 
@@ -340,7 +354,7 @@ curl -OJ 'localhost:3000/api/sessions/7/export?format=md'   # session-7.md로 �
 ```
 
 - **녹음 중인 세션의 상세는 DB에 저장된 세그먼트만 보여 줍니다.** 실시간 내용은 스트림으로 봅니다.
-- **서버가 강제로 꺼진 세션은 `endedAt`이 서버를 다시 켠 시각입니다.** `endedAt - startedAt`으로 길이를 세면 실제보다 길게 나옵니다. 그래서 녹음 길이는 마지막 문장의 끝 시각(`endMs` 중 가장 큰 값)으로 셉니다(2026-10-27 결정). 내보내기(T11)가 이 규칙을 쓰고, 히스토리 화면(T16)도 같은 규칙을 씁니다. `ended_at` 값은 고치지 않습니다.
+- **서버가 강제로 꺼진 세션은 `endedAt`이 서버를 다시 켠 시각입니다.** `endedAt - startedAt`으로 길이를 세면 실제보다 길게 나옵니다. 그래서 녹음 길이는 마지막 문장의 끝 시각(`endMs` 중 가장 큰 값)으로 셉니다(2026-10-27 결정). 내보내기(T11)와 히스토리 화면(T16)이 같은 함수(`packages/shared`의 `recordingLengthMs`)로 셉니다. `ended_at` 값은 고치지 않습니다.
 - **내보낸 파일은 머리말(녹음 번호, 시작 시각, 길이, 상태) 아래에 문장마다 시작 시각을 붙입니다.** 시작 시각은 기기 시간대와 상관없이 한국 시간(`Asia/Seoul`)으로 씁니다. 문장 앞 시각은 `00:08`, 1시간이 넘으면 `1:02:03`입니다. 문장이 없는 세션은 `(저장된 문장이 없습니다)` 한 줄입니다. 파일 모양은 [`T11.md`](guides/T11.md)에 있습니다.
 - **DB가 꺼져 있으면 `503` `DB_UNAVAILABLE`입니다.** 다른 세션 API와 같습니다(T13 전에는 `500`).
 
@@ -425,7 +439,7 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 | 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다. 다시 접속하면 `segmentId`로 빠진 final을 찾아 먼저 보냅니다 | 전부 | 구현됨 (T07, 이어받기는 T09) |
 | 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
 | DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 구현됨 (T08) |
-| 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | API 구현됨 (T10), 내보내기 구현됨 (T11), 화면은 예정 (T16) |
+| 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | API 구현됨 (T10), 내보내기 구현됨 (T11), 화면 구현됨 (T16) |
 
 서버 코드에서 어댑터를 쓰는 방법입니다. 변수 타입을 `SttAdapter`로 두면 나중에 실제 STT로 바꿀 때 `new MockSttAdapter()` 한 곳만 바뀝니다.
 
@@ -475,6 +489,6 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
