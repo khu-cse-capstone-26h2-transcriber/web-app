@@ -54,6 +54,7 @@ flowchart LR
 | 클라이언트 | React 웹앱 |
 | 웹앱 빌드 도구 | Vite. 라우팅은 React Router, 서버 호출은 `fetch` 래퍼. 개발 중에는 Vite 프록시로 서버에 연결 (CORS 없음) |
 | 백엔드 | Node.js + TypeScript, npm workspaces 모노레포 |
+| Node | 22 (`.nvmrc`의 22.22.0). Node 20 지원 종료로 2026-10-30에 올림 (T25) |
 | 서버 프레임워크 | Express |
 | 실시간 전달 | SSE로 시작, 추후 WebSocket 전환을 고려해 설계 |
 | 사용자 모델 | 단일 사용자, 로그인 없음 |
@@ -81,6 +82,8 @@ speech-transcriber/
 ├─ package.json               # npm workspaces, 공통 스크립트
 ├─ tsconfig.base.json         # 공통 컴파일러 옵션
 ├─ .env.example               # PORT, DB_URL, STT_URL (복사해서 .env로 씀)
+├─ .nvmrc                     # 개발 Node 판 (22.22.0)
+├─ .npmrc                     # engine-strict=true (다른 Node 판에서는 설치 실패)
 ├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
 ├─ apps/
 │  ├─ server/                 # @app/server — Node.js 백엔드
@@ -123,7 +126,7 @@ speech-transcriber/
 │        │  ├─ client.ts      # fetch 래퍼(JSON, 파일), ApiError
 │        │  ├─ endpoints.ts   # 서버 API 함수 (/health, 세션 시작·종료·진행 중, 히스토리 목록·상세·내보내기)
 │        │  ├─ useApiData.ts  # 화면에서 API 하나를 불러 쓰는 훅
-│        │  ├─ useServerHealth.ts   # /health를 30초마다 다시 확인하는 훅
+│        │  ├─ useServerHealth.ts   # /health를 30초마다(실패하면 5초마다) 다시 확인하는 훅
 │        │  └─ useSessionStream.ts  # 세션 스트림(SSE)을 구독해 자막 상태로 쓰는 훅, 끊김 감지와 다시 연결
 │        ├─ components/
 │        │  ├─ ConnectionBanner.tsx # 자막 스트림 연결 배너 (끊김, 다시 연결됨)
@@ -149,7 +152,7 @@ speech-transcriber/
 
 ## 실행 방법
 
-Node.js 20 기준으로 개발합니다. DB는 Docker Desktop이 켜져 있어야 뜹니다.
+Node.js 22(`.nvmrc`의 22.22.0) 기준으로 개발합니다. nvm을 쓰면 루트에서 `nvm use`로 맞춥니다. `.npmrc`의 `engine-strict` 때문에 다른 판에서는 `npm install`·`npm ci`가 `EBADENGINE`으로 실패합니다. DB는 Docker Desktop이 켜져 있어야 뜹니다.
 
 ```bash
 npm install          # 루트에서 한 번
@@ -177,7 +180,7 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 | `/history/:id` | 히스토리 상세 | 머리말(시작, 길이, 상태), txt·md 내려받기 버튼, 문장별 시각 (T16) |
 | 그 밖의 주소 | 페이지를 찾을 수 없음 | |
 
-모든 화면 위쪽에 메뉴와 서버 상태가 있습니다. 서버 상태는 `/health`를 불러 `정상`, `DB에 연결하지 못했습니다`, `서버에 연결하지 못했습니다` 중 하나로 보여 줍니다. 웹앱을 열 때, 그 뒤 30초마다, 녹음 화면의 자막 스트림이 다시 연결될 때 다시 확인하므로, 서버가 다시 켜지면 새로고침하지 않아도 `정상`으로 돌아옵니다(T15). 다시 확인하는 동안에는 직전 결과를 그대로 보여 줍니다.
+모든 화면 위쪽에 메뉴와 서버 상태가 있습니다. 서버 상태는 `/health`를 불러 `정상`, `DB에 연결하지 못했습니다`, `서버에 연결하지 못했습니다`, `서버가 답하지 않습니다` 중 하나로 보여 줍니다. 웹앱을 열 때, 그 뒤 30초마다, 녹음 화면의 자막 스트림이 다시 연결될 때 다시 확인합니다(T15). 확인이 실패하면 성공할 때까지 5초마다 다시 확인하므로, 서버가 다시 켜지면 새로고침하지 않아도 늦어도 5초 안에 `정상`으로 돌아옵니다. `/health`가 5초 안에 답하지 않으면(서버가 멈춤) `서버가 답하지 않습니다`로 보입니다(T25). 다시 확인하는 동안에는 직전 결과를 그대로 보여 줍니다.
 
 녹음 화면(T13)은 화면을 열 때 `GET /api/sessions/active`로 진행 중인 녹음을 확인합니다. 녹음 중이면 `녹음 중 · 01:23 (#12)`처럼 흐른 시간과 세션 번호를 보여 주고, 아니면 `녹음하고 있지 않습니다`를 보여 줍니다. 녹음의 주 제어는 기기의 물리 버튼이고, 화면의 '녹음 시작'·'녹음 종료' 버튼은 개발·시연·원격 종료용 보조 수단입니다.
 
