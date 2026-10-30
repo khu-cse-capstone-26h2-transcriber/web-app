@@ -11,7 +11,7 @@ export interface LayoutContext {
   recheckServer: () => void;
 }
 
-// 서버와 DB가 살아 있는지 보여 준다. 열 때와 30초마다 다시 확인한다(T15).
+// 서버와 DB가 살아 있는지 보여 준다. 열 때와 30초마다, 실패한 동안에는 5초마다 다시 확인한다(T15, T25).
 // 녹음 중 실시간 연결이 끊긴 것은 녹음 화면 맨 위의 배너가 따로 알린다.
 function ServerStatus({ health }: { health: ApiState<Health> }) {
   if (health.status === 'loading') return <span>서버 확인 중…</span>;
