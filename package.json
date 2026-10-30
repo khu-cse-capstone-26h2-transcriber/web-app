@@ -6,6 +6,9 @@
     "apps/*",
     "packages/*"
   ],
+  "engines": {
+    "node": "^22.12.0"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/tsconfig.node.json && tsc --noEmit -p packages/shared",
     "dev:server": "npm run dev -w @app/server",
@@ -14,7 +17,7 @@
     "db:migrate": "npm run db:migrate -w @app/server"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "^22.20.5",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2"
   }
