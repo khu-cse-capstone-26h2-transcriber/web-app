@@ -40,8 +40,8 @@ flowchart LR
 
 | 구성 요소 | 위치 | 역할 | 상태 |
 | --- | --- | --- | --- |
-| STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 구현체는 mock |
-| 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20) |
+| STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 기본 구현체는 mock. `STT_MODE=local`이면 노트북에서 실제 모델 엔진을 띄우는 실험용 구현체 (T28) |
+| 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20). 노트북에서는 공개 모델 `seastar105/whisper-small-komixv2`를 저장소 밖 엔진으로 붙여 확인함 (T28 실험) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
@@ -81,7 +81,7 @@ speech-transcriber/
 ├─ TODO.md                    # 작업 목록과 작업 기록
 ├─ package.json               # npm workspaces, 공통 스크립트
 ├─ tsconfig.base.json         # 공통 컴파일러 옵션
-├─ .env.example               # PORT, DB_URL, STT_URL (복사해서 .env로 씀)
+├─ .env.example               # PORT, DB_URL, STT_URL, STT_MODE, LOCAL_STT_* (복사해서 .env로 씀)
 ├─ .nvmrc                     # 개발 Node 판 (22.22.0)
 ├─ .npmrc                     # engine-strict=true (다른 Node 판에서는 설치 실패)
 ├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
@@ -94,7 +94,7 @@ speech-transcriber/
 │  │     ├─ index.ts          # 진입점 (listen, 남은 세션 정리, 종료 처리)
 │  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, 404·에러 처리)
 │  │     ├─ config/
-│  │     │  └─ env.ts         # 환경변수 로더
+│  │     │  └─ env.ts         # 환경변수 로더 (STT_MODE와 실험용 엔진 경로 포함)
 │  │     ├─ db/
 │  │     │  ├─ pool.ts        # pg 연결 풀
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
@@ -113,6 +113,7 @@ speech-transcriber/
 │  │     └─ stt/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
+│  │        ├─ local.ts       # LocalSttAdapter (T28 실험, 실제 모델 엔진을 자식 프로세스로 실행)
 │  │        └─ demo.ts        # mock 이벤트 확인용 스크립트
 │  └─ web/                    # @app/web — React 웹앱
 │     ├─ index.html           # 웹앱 HTML (#root)
@@ -167,7 +168,17 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 
 `dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다. 다른 API도 DB에 닿지 못해 실패하면 `503` `DB_UNAVAILABLE`로 답합니다(T13).
 
-`PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
+`PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `STT_MODE`는 비워 두면 mock이고, `local`이면 `LOCAL_STT_PYTHON`, `LOCAL_STT_SCRIPT`, `LOCAL_STT_WAV`도 있어야 합니다(빠지면 같은 방식으로 종료 코드 1). `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
+
+실제 모델로 받아쓰기를 해 보려면(T28 실험) 저장소 밖 `~/Desktop/stt-lab`의 가상환경과 엔진이 있어야 합니다. 준비 방법은 그 폴더의 `README.md`에 있습니다. 서버는 아래처럼 띄우며, 경로는 모두 절대 경로입니다. 웹에서 '녹음 시작'을 누르면 엔진이 모델을 불러오느라 시작까지 10초 가까이 걸립니다.
+
+```bash
+STT_MODE=local \
+LOCAL_STT_PYTHON=$HOME/Desktop/stt-lab/.venv/bin/python \
+LOCAL_STT_SCRIPT=$HOME/Desktop/stt-lab/stream_engine.py \
+LOCAL_STT_WAV=$HOME/Desktop/stt-lab/samples/demo_long.wav \
+npm run dev:server
+```
 
 ## 웹앱
 
@@ -438,9 +449,9 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 
 | 단계 | 하는 일 | 쓰는 필드 | 상태 |
 | --- | --- | --- | --- |
-| 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05, mock) |
+| 만들기 | `SttAdapter` 구현체가 인식 결과가 생길 때마다 이벤트를 만들어 `onEvent`로 넘깁니다 | 전부 | 구현됨 (T05 mock, T28 노트북 실험용 local) |
 | 화면으로 보내기 | 서버가 받은 이벤트를 SSE로 웹앱에 전달합니다. 다시 접속하면 `segmentId`로 빠진 final을 찾아 먼저 보냅니다 | 전부 | 구현됨 (T07, 이어받기는 T09) |
-| 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 예정 (T14) |
+| 화면에 그리기 | 같은 `segmentId`의 줄을 새 `text`로 덮어씁니다. `type`으로 확정 여부를 구분합니다 | `type`, `segmentId`, `text` | 구현됨 (T14) |
 | DB에 저장하기 | `type`이 final인 이벤트만 저장합니다. 세그먼트당 한 행이 됩니다 | 전부 | 구현됨 (T08) |
 | 히스토리 보여 주기 | 저장한 세그먼트를 순서대로 읽어 보여 줍니다. `startMs`와 `endMs`로 문장별 시각을 표시할 수 있습니다 | `segmentId`, `text`, `startMs`, `endMs` | API 구현됨 (T10), 내보내기 구현됨 (T11), 화면 구현됨 (T16) |
 
@@ -488,10 +499,11 @@ await adapter.stop();
 - **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트는 서버가 묶습니다(T06). 서버가 세션마다 어댑터를 새로 만들고, 그 어댑터가 준 이벤트를 그 세션의 것으로 봅니다. 나머지는 D4 협의에서 정합니다.
 - **final이 오지 않은 세그먼트는 저장되지 않습니다.** 문장 중간에 녹음을 종료하면 그 문장은 DB에 없습니다. 실제 STT가 정지할 때 마지막 final을 내주는지는 D4 협의에서 정합니다.
 - **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
+- **노트북 실험용 구현체가 있습니다(T28).** `STT_MODE=local`이면 `LocalSttAdapter`가 세션마다 저장소 밖 Python 엔진을 띄워, WAV를 실제 말하는 속도로 받아쓴 결과를 표준 출력의 JSON 줄로 받습니다. `segmentId`는 어댑터가 붙이고, `startMs`·`endMs`는 오디오 길이로 셉니다. 녹음을 끝내면 엔진이 말하던 구간을 final로 내고 끝나므로 마지막 문장도 저장됩니다. 다시 받아쓴 partial에는 엉뚱한 문장이 섞일 수 있습니다. 최종 연동 방식은 T19 합의 뒤 T20에서 정하며, 자세한 내용은 [`T28.md`](guides/T28.md)에 있습니다.
 
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
