@@ -4,12 +4,19 @@ import { createApp } from './app';
 import { loadEnv, maskDbUrl } from './config/env';
 import { createPool } from './db/pool';
 import { SessionManager } from './sessions/manager';
+import type { SttAdapter } from './stt/adapter';
+import { LocalSttAdapter } from './stt/local';
 import { MockSttAdapter } from './stt/mock';
 
 const env = loadEnv();
 const pool = createPool(env.dbUrl);
 // 실제 STT로 바꿀 때는 이 함수가 만드는 어댑터만 바뀐다. (T20)
-const sessions = new SessionManager(pool, () => new MockSttAdapter());
+// STT_MODE=local이면 노트북에서 실제 모델 엔진을 띄운다. (T28 실험)
+const { localStt } = env;
+const createAdapter: () => SttAdapter = localStt
+  ? () => new LocalSttAdapter(localStt)
+  : () => new MockSttAdapter();
+const sessions = new SessionManager(pool, createAdapter);
 const app = createApp(pool, sessions);
 
 // 서버가 꺼질 때 닫지 못한 세션을 정리한다. DB가 꺼져 있어도 서버는 띄운다.
@@ -34,8 +41,9 @@ const server = app.listen(env.port, (error?: Error) => {
   console.log(`[server] ready - ${APP_NAME} http://localhost:${env.port}`);
   // 비밀번호는 가리고 찍는다.
   console.log(
-    `[server] config - PORT=${env.port} DB_URL=${maskDbUrl(env.dbUrl)} STT_URL=${env.sttUrl}`,
+    `[server] config - PORT=${env.port} DB_URL=${maskDbUrl(env.dbUrl)} STT_URL=${env.sttUrl} STT_MODE=${env.sttMode}`,
   );
+  if (localStt) console.log(`[server] local STT - ${localStt.script} (WAV ${localStt.wav})`);
 });
 
 // 새 요청을 받지 않고, 처리 중인 요청이 끝나면 진행 중인 세션과 DB 풀을 닫고 끝낸다.
