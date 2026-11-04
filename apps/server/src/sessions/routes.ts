@@ -27,7 +27,7 @@ function parseSessionId(value: string): number {
 }
 
 // Last-Event-ID 헤더를 마지막으로 받은 final의 segmentId로 읽는다. 없거나 비어 있으면 undefined(처음부터)다.
-function parseLastEventId(value: string | undefined): number | undefined {
+export function parseLastEventId(value: string | undefined): number | undefined {
   if (value === undefined || value === '') return undefined;
   const id = Number(value);
   if (!/^(0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(id)) {
