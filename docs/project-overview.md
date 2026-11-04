@@ -63,7 +63,7 @@ flowchart LR
 | 히스토리 다운로드 포맷 | txt와 md 둘 다 (D6, 2026-10-27) |
 | 개발 환경 | 노트북에서 먼저 개발. STT·DB 주소는 환경변수로 분리 |
 | STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
-| 테스트 | Vitest, 핵심 로직만 |
+| 테스트 | Vitest 5, 핵심 로직만(내보내기 포매터, 이벤트 재개, 세그먼트 병합). 루트에서 `npm test` (T17) |
 | 백엔드 위치 | Rubik Pi 안을 목표로 설계. 실측 결과에 따라 SQLite 또는 별도 서버로 바뀔 수 있음 |
 | 기기 OS | Rubik Pi 3에 Ubuntu for Qualcomm (하드웨어 파트 결정) |
 
@@ -85,6 +85,7 @@ speech-transcriber/
 ├─ .nvmrc                     # 개발 Node 판 (22.22.0)
 ├─ .npmrc                     # engine-strict=true (다른 Node 판에서는 설치 실패)
 ├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
+├─ vitest.config.ts           # Vitest 설정 (테스트를 찾는 범위, node 환경)
 ├─ apps/
 │  ├─ server/                 # @app/server — Node.js 백엔드
 │  │  ├─ migrations/
@@ -151,6 +152,8 @@ speech-transcriber/
    └─ logs/                   # 일자별 작업 기록 (YYYY-MM-DD.md)
 ```
 
+단위 테스트는 테스트하는 파일 옆에 `*.test.ts`로 둡니다(T17). 지금은 `packages/shared/src/format.test.ts`, `apps/server/src/export/format.test.ts`, `apps/server/src/sessions/routes.test.ts`·`manager.test.ts`, `apps/web/src/api/useSessionStream.test.ts` 다섯 개입니다.
+
 ## 실행 방법
 
 Node.js 22(`.nvmrc`의 22.22.0) 기준으로 개발합니다. nvm을 쓰면 루트에서 `nvm use`로 맞춥니다. `.npmrc`의 `engine-strict` 때문에 다른 판에서는 `npm install`·`npm ci`가 `EBADENGINE`으로 실패합니다. DB는 Docker Desktop이 켜져 있어야 뜹니다.
@@ -161,10 +164,13 @@ cp .env.example .env # 처음 한 번. .env가 없으면 dev:server가 실행되
 docker compose up -d # 로컬 PostgreSQL 실행 (끌 때는 docker compose down)
 npm run db:migrate   # 아직 적용하지 않은 마이그레이션 실행 (다시 실행해도 안전)
 npm run typecheck    # 모든 워크스페이스 타입 검사
+npm test             # 핵심 로직 단위 테스트 (DB와 Docker 없이 돎)
 npm run dev:server   # 서버 실행 (끌 때는 Ctrl+C)
 npm run dev:web      # 웹앱 개발 서버 실행 (http://localhost:5173, 서버도 켜 둠)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
+
+`npm test`는 루트 `vitest.config.ts`에 따라 `apps/*/src`, `packages/*/src` 아래의 `*.test.ts`만 돌립니다. 저장소 안 `.claude/worktrees/`의 다른 작업 트리는 보지 않습니다. `SessionManager` 테스트는 DB 함수를 테스트 안에서 가짜로 바꾸므로 DB가 꺼져 있어도 됩니다. 고치면서 계속 돌려 보려면 `npx vitest`(감시 모드)를 씁니다(T17).
 
 `dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다. 다른 API도 DB에 닿지 못해 실패하면 `503` `DB_UNAVAILABLE`로 답합니다(T13).
 
@@ -504,6 +510,6 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md)
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
 - [`docs/logs/`](logs/): 일자별 작업 기록
