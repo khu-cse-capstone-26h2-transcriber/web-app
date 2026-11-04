@@ -53,7 +53,7 @@ function upsertFinal(finals: SttEvent[], event: SttEvent): SttEvent[] {
   return next;
 }
 
-function applyMessage(state: TranscriptState, message: SttEvent): TranscriptState {
+export function applyMessage(state: TranscriptState, message: SttEvent): TranscriptState {
   if (message.type === 'partial') {
     // 이미 확정된 세그먼트의 partial이 늦게 오면 무시한다.
     if (state.finals.some((f) => f.segmentId === message.segmentId)) return state;
