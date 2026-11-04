@@ -11,6 +11,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/tsconfig.node.json && tsc --noEmit -p packages/shared",
+    "test": "vitest run",
     "dev:server": "npm run dev -w @app/server",
     "dev:web": "npm run dev -w @app/web",
     "dev:stt": "npm run dev:stt -w @app/server",
@@ -19,6 +20,7 @@
   "devDependencies": {
     "@types/node": "^22.20.5",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
   }
 }
