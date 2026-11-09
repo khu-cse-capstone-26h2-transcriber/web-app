@@ -21,10 +21,11 @@ function toSession(row: SessionRow): Session {
   };
 }
 
-// 녹음 중인 세션을 하나 만든다. status의 기본값이 recording이다.
-export async function insertSession(pool: Pool): Promise<Session> {
+// 녹음 중인 세션을 하나 만든다. status의 기본값이 recording이다. 기기 세션이면 기기의 세션 번호를 함께 저장한다.
+export async function insertSession(pool: Pool, deviceSessionId?: string): Promise<Session> {
   const { rows } = await pool.query<SessionRow>(
-    `insert into sessions default values returning ${COLUMNS}`,
+    `insert into sessions (device_session_id) values ($1) returning ${COLUMNS}`,
+    [deviceSessionId ?? null],
   );
   return toSession(rows[0]);
 }

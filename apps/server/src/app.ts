@@ -1,6 +1,8 @@
 // Express 앱을 조립한다. listen은 index.ts에서 한다.
 import express, { type Express } from 'express';
 import type { Pool } from 'pg';
+import { DeviceIngest } from './device/ingest';
+import { createDeviceRouter } from './device/routes';
 import { errorHandler, HttpError, notFoundHandler } from './http/errors';
 import type { SessionManager } from './sessions/manager';
 import { createSessionRouter } from './sessions/routes';
@@ -21,6 +23,8 @@ export function createApp(pool: Pool, sessions: SessionManager): Express {
 
   // API는 모두 /api 아래에 둔다.
   app.use('/api/sessions', createSessionRouter(pool, sessions));
+  // 기기(audiostackd)가 세션 통지와 인식 결과를 보내는 경로 (T20). 데몬 설정 [backend]의 경로 세 줄을 여기로 맞춘다.
+  app.use('/api/device/sessions', createDeviceRouter(new DeviceIngest(pool, sessions)));
 
   // 라우트 뒤에 둔다. 순서가 바뀌면 모든 요청이 404가 된다.
   app.use(notFoundHandler);
