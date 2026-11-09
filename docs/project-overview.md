@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-10-19 · 이광호
+마지막 갱신: 2026-11-09 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -41,7 +41,7 @@ flowchart LR
 | 구성 요소 | 위치 | 역할 | 상태 |
 | --- | --- | --- | --- |
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 기본 구현체는 mock. `STT_MODE=local`이면 노트북에서 실제 모델 엔진을 띄우는 실험용 구현체 (T28) |
-| 실제 STT | 미정 | 기기 안에서 음성을 인식합니다 | 예정 (T19 합의 후 T20). 노트북에서는 공개 모델 `seastar105/whisper-small-komixv2`를 저장소 밖 엔진으로 붙여 확인함 (T28 실험) |
+| 실제 STT | AI 파트 `stt-engine` 저장소 (비공개) | 기기 안에서 음성을 인식합니다. `audiostackd`에게서 오디오를 받아 결과를 돌려주고, 데몬이 결과를 서버로 보냅니다 | 엔진은 보드 NPU에서 동작함(AI 파트, 2026-11-09). 서버 연동은 T19 합의 뒤 T20이며, 박지윤이 올린 초안 PR(web-app #1)을 검토하는 중. 노트북에서는 같은 공개 모델을 저장소 밖 엔진으로 붙여 확인함 (T28 실험) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
@@ -65,11 +65,13 @@ flowchart LR
 | STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
 | 테스트 | Vitest 5, 핵심 로직만(내보내기 포매터, 이벤트 재개, 세그먼트 병합). 루트에서 `npm test` (T17) |
 | 백엔드 위치 | Rubik Pi 안을 목표로 설계. 실측 결과에 따라 SQLite 또는 별도 서버로 바뀔 수 있음 |
-| 기기 OS | Rubik Pi 3에 Ubuntu for Qualcomm (하드웨어 파트 결정) |
+| 기기 OS | Rubik Pi 3에 Ubuntu for Qualcomm (하드웨어 파트 결정). AI 파트가 측정한 보드는 Ubuntu 24.04 (2026-11-09) |
+| STT 엔진 | `seastar105/whisper-small-komixv2`를 QNN으로 변환해 NPU에서 실행. `audiostackd`의 `engine.sock`에 접속하는 별도 프로그램(`stt-engine` 저장소). 결과 형식과 세션 처리 규칙은 `stt-engine`의 `ENGINE_CONTRACT.md` (AI 파트 결정, 2026-11-09) |
+| 엔진 입력 오디오 | 16 kHz 모노 S16_LE를 20 ms(640바이트)씩. 마이크는 `audiostackd`만 열고, 앱 서버는 오디오를 다루지 않음 (하드웨어 파트 구현) |
 
 아직 정해지지 않은 것은 다음과 같습니다. 결정 번호는 `TODO.md`의 표기입니다.
 
-- STT 호출 방법, 오디오 입력 형식, partial/final 이벤트의 최종 형식 (D4, AI·하드웨어 파트 협의)
+- STT 연동 방식: 녹음 시작·종료 주체와 세션 번호 발급, 서버의 수신 경로, `segmentId`를 누가 붙일지, 빈 final 처리 (D4, 하드웨어 파트 합의가 남음). 엔진 결과 형식과 오디오 형식은 정해짐
 - Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획), 기기 수령 시점 (D5, 하드웨어 파트 협의)
 - 팀 전체 마일스톤과 주차별 일정 (D7)
 - PostgreSQL 메모리 설정, SQLite 전환 여부 (D8, 기기 실측 후)
@@ -404,6 +406,8 @@ STT 이벤트는 STT가 "방금 이만큼 인식했다"고 서버에 알리는 �
 
 지금 형식은 **초안**입니다. 최종 형식은 T19에서 AI 파트(박지윤), 하드웨어 파트(김범수)와 합의해 확정하며, 실제 STT가 내주는 형식에 따라 바뀔 수 있습니다.
 
+실제 엔진이 내는 결과의 형식은 2026-11-09에 AI 파트가 정했습니다(`stt-engine`의 `ENGINE_CONTRACT.md`). partial은 누적이고, final은 구간마다 한 번이며, 시각은 세션 시작 기준 ms라서 아래 다섯 필드의 전제와 맞습니다. 엔진 결과를 이 다섯 필드로 바꾸는 규칙은 [`T19.md`](guides/T19.md)에 있습니다.
+
 ### 필드
 
 | 필드 | 타입 | 담는 값 |
@@ -503,7 +507,7 @@ await adapter.stop();
 - **mock의 시각은 실제 오디오 시각이 아닙니다.** 오디오가 없어서 단어 하나당 200ms씩 더한 값입니다.
 - **mock은 문장 목록을 반복합니다.** 세 문장이 끝나면 첫 문장으로 돌아가 `stop()`을 부를 때까지 계속하고, `segmentId`는 계속 증가합니다. `npm run dev:stt`는 한 바퀴 뒤에 스스로 멈춥니다.
 - **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트는 서버가 묶습니다(T06). 서버가 세션마다 어댑터를 새로 만들고, 그 어댑터가 준 이벤트를 그 세션의 것으로 봅니다. 나머지는 D4 협의에서 정합니다.
-- **final이 오지 않은 세그먼트는 저장되지 않습니다.** 문장 중간에 녹음을 종료하면 그 문장은 DB에 없습니다. 실제 STT가 정지할 때 마지막 final을 내주는지는 D4 협의에서 정합니다.
+- **final이 오지 않은 세그먼트는 저장되지 않습니다.** 문장 중간에 녹음을 종료하면 mock에서는 그 문장이 DB에 없습니다. 실제 엔진은 세션 종료를 받으면 말하던 구간을 final로 내고 끝 신호(`session_done`)를 보냅니다(2026-11-09 확인). 데몬이 그 신호를 받은 뒤 세션 종료를 서버에 보내도록 고치는 PR(audio-stack #1)은 아직 병합 전입니다.
 - **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
 - **노트북 실험용 구현체가 있습니다(T28).** `STT_MODE=local`이면 `LocalSttAdapter`가 세션마다 저장소 밖 Python 엔진을 띄워, WAV를 실제 말하는 속도로 받아쓴 결과를 표준 출력의 JSON 줄로 받습니다. `segmentId`는 어댑터가 붙이고, `startMs`·`endMs`는 오디오 길이로 셉니다. 녹음을 끝내면 엔진이 말하던 구간을 final로 내고 끝나므로 마지막 문장도 저장됩니다. 다시 받아쓴 partial에는 엉뚱한 문장이 섞일 수 있습니다. 최종 연동 방식은 T19 합의 뒤 T20에서 정하며, 자세한 내용은 [`T28.md`](guides/T28.md)에 있습니다.
 
@@ -511,5 +515,7 @@ await adapter.stop();
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
 - [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md)
-- [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록
+- [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록과 답
+- [`stt-engine` `ENGINE_CONTRACT.md`](https://github.com/khu-cse-capstone-26h2-transcriber/stt-engine/blob/main/ENGINE_CONTRACT.md): AI 파트가 정한 엔진 결과 형식과 세션 처리 규칙 (비공개 저장소)
+- [`audio-stack` `docs/PROTOCOL.md`](https://github.com/khu-cse-capstone-26h2-transcriber/audio-stack/blob/main/docs/PROTOCOL.md): 데몬과 엔진 사이 프로토콜, 데몬이 백엔드로 보내는 요청
 - [`docs/logs/`](logs/): 일자별 작업 기록
