@@ -73,7 +73,7 @@ flowchart LR
 아직 정해지지 않은 것은 다음과 같습니다. 결정 번호는 `TODO.md`의 표기입니다.
 
 - STT 연동 방식: 녹음 시작·종료 주체와 세션 번호 발급, 서버의 수신 경로 (D4, 하드웨어 파트 합의가 남음). 엔진 결과 형식과 오디오 형식은 정해짐
-- Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획) (D5, 하드웨어 파트 협의)
+- Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획. `audio-stack` 기본 설정은 3.5 mm 헤드셋이고 XVF3800 USB 마이크 설정도 있음) (D5, 하드웨어 파트 협의)
 - 팀 전체 마일스톤과 주차별 일정 (D7)
 - PostgreSQL 메모리 설정, SQLite 전환 여부 (D8, 기기 실측 후)
 
@@ -543,6 +543,7 @@ await adapter.stop();
 - [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 기기 결과 수신 경로 병합과 시험은 [`T20.md`](guides/T20.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md), 노트북 실제 모델 시험은 [`T29.md`](guides/T29.md)
 - [`docs/device-ingest.md`](device-ingest.md): 보드 없이 Mac에서 기기 연동을 시험하는 방법
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록과 답
+- [`docs/team-questions.md`](team-questions.md): 팀원에게 물을 것의 현황. 팀 저장소에서 답을 찾은 것과 아직 물어야 할 것
 - [`stt-engine` `ENGINE_CONTRACT.md`](https://github.com/khu-cse-capstone-26h2-transcriber/stt-engine/blob/main/ENGINE_CONTRACT.md): AI 파트가 정한 엔진 결과 형식과 세션 처리 규칙 (비공개 저장소)
 - [`audio-stack` `docs/PROTOCOL.md`](https://github.com/khu-cse-capstone-26h2-transcriber/audio-stack/blob/main/docs/PROTOCOL.md): 데몬과 엔진 사이 프로토콜, 데몬이 백엔드로 보내는 요청
 - [`docs/logs/`](logs/): 일자별 작업 기록

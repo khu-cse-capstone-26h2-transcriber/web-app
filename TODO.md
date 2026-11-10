@@ -55,8 +55,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### T26 Rubik Pi에서 모델과 서버 연동 준비
 
-- 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지
-- 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로
+- 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지 — 2026-11-10 `stt-engine` 저장소로 답 찾음: 모델은 Release `v0.1`, 실행은 `build.sh`·`set_governor.sh performance`·`run_engine.sh`, 보드 NPU에서 실제 `audiostackd`를 거쳐 확인함. 남은 것: QNN 런타임(`sdk250/`)을 받는 방법(`docs/team-questions.md` AI-1)
+- 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로 — 2026-11-10 저장소로 답 찾음: 엔진은 기본 `ubuntu` 계정·`audio` 그룹으로 돎, WAV는 `feed_wav.py` 또는 `snd-aloop`(실제 데몬을 거침). 남은 것: `audiostack.conf` 경로 변경 동의(HW-1), audio-stack PR #1·#2 병합(HW-6)
 - 측정: final 지연, CER, 세 프로그램을 함께 돌릴 때의 메모리·CPU (D8 판단 근거)
 
 ## 함께 확인할 것
@@ -68,6 +68,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 - [ ] 박지윤에게 PR #1 병합 방식 알리기 (T20 push 전)
+- [ ] 팀원에게 남은 질문 보내기 — `docs/team-questions.md` 2장(김범수 HW-1~8, 박지윤 AI-1~7, 둘 다 ALL-1). 보낼지와 보내는 방법은 사용자가 정함
 
 ### 결정하면 풀리는 작업
 
@@ -135,7 +136,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 | 결정 | 내용 | 협의 파트(상대) | 막는 작업 | 늦어도 필요한 시점 |
 | --- | --- | --- | --- | --- |
 | D4 | STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식. 2026-10-17 종합본(1차 멘토링 자료)에서 일부 답: 마이크는 `audiostackd`가 읽음, partial 지원, 구간은 6초 이후 단어 사이·최대 10초. 남은 쟁점: 결과 전달 방향(데몬이 백엔드로 HTTP POST 중), 세션 ID 발급과 시작·종료 주체, `seq`와 `segmentId`, STT 주소. 상세는 `docs/d4-stt-questions.md` 답 칸. 녹음 시작·종료의 주 제어는 기기 물리 버튼(2026-10-20 사용자 결정). 버튼 신호가 백엔드에 오는 경로, 웹에서 시작할 때 데몬에 알리는 방법, 화면이 다른 곳에서 시작한 녹음을 알아채는 방법도 함께 정함. 2026-11-02 `audio-stack` 확인: 데몬은 켜면 바로 세션을 만들고, 경로는 `audiostack.conf`에서 바꿀 수 있음. 서버와 다른 점은 `docs/logs/2026-11-02.md`. 2026-11-09 AI 파트가 `stt-engine` `ENGINE_CONTRACT.md`로 엔진 결과 형식을 확정(partial 누적, 구간마다 final 한 번, 세션 기준 ms, 빈 final `empty: true`, 끝 신호 `session_done`). 남은 쟁점: 세션 주체와 수신 경로(하드웨어 동의). 앱 결정(2026-11-09): `segmentId`는 서버가 붙임, 빈 final은 버림, 세션 교체 때 앞 세션은 `ended`. 상세는 `docs/guides/T19.md` '2026-11-09 확인 결과' | [AI](박지윤), [하드웨어](김범수) | T19, T20, T26, T27 | T05 완료 직후 |
-| D5 | 입출력(마이크 등). 기기는 사용자가 보관(2026-11-10). OS는 Ubuntu 24.04로 확정(2026-11-10 사용자 결정, AI 파트가 측정한 보드도 24.04). 마이크는 3.5 mm 포트 계획 | [하드웨어](김범수) | T21, T26 | T18 완료 전 |
+| D5 | 입출력(마이크 등). 기기는 사용자가 보관(2026-11-10). OS는 Ubuntu 24.04로 확정(2026-11-10 사용자 결정, AI 파트가 측정한 보드도 24.04). 마이크는 3.5 mm 포트 계획. `audio-stack` 기본 설정은 3.5 mm 헤드셋(`plughw:0,2`, 48 kHz)이고 XVF3800 USB 마이크 설정도 있음. 무엇을 쓸지와 실물을 누가 가졌는지 확인 필요(`docs/team-questions.md` HW-7, 2026-11-10) | [하드웨어](김범수) | T21, T26 | T18 완료 전 |
 | D7 | 팀 전체 마일스톤과 주차별 일정 | [AI], [하드웨어] 모두 | 우선순위 재조정 | 가능한 빨리 |
 | D8 | PostgreSQL 메모리 설정, SQLite 전환 여부 | [하드웨어](김범수), 실측 후 | T21 이후 | T21 완료 후 |
 
@@ -145,6 +146,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-10 | 팀 저장소 확인 | 완료 | 브랜치 `docs/team-repo-findings`(`docs/t30-device-setup`에서)에서 조직 저장소를 읽기만 해 확인. `stt-engine` `c8f5bd3`·`audio-stack` `7ee28fa` 그대로, audio-stack PR #1·#2 리뷰 없음, 김범수 답 없음. 물을 것 중 12개는 저장소에서 답을 찾음(`ctrl.sock`은 `root:audio 0660`이라 서버 계정을 `audio` 그룹에 넣으면 됨, `503`·`4xx`는 3초마다 계속 다시 보냄, 대기열이 차면 세션 통지·`/end`도 버려질 수 있음, 엔진이 끊겨도 데몬은 세션 유지, NPU는 `ubuntu` 계정, WAV 경로 두 가지 등). 새 파일 `docs/team-questions.md`, `T19.md`·`T30.md`·`d4-stt-questions.md`·`project-overview.md` 갱신. 데몬·엔진 실행과 코드 변경 없음 | 남은 질문 김범수 8개, 박지윤 7개(새 질문: QNN 런타임 받는 방법, 같은 보드에서 CPU 나누기), 둘 다 1개. 보낼지는 사용자가 정함. 조직 Projects는 토큰 권한(`read:project`)이 없어 못 봄. 커밋 안 함 | 질문 보내기, T30 착수 |
 | 2026-11-10 | T30 | 진행 중 | 브랜치 `docs/t30-device-setup`에서 지침서 `T30.md` 작성(9단계, 단계별 확인 명령, 2단계 판단 표). Thundercomm 매뉴얼 1.0.0-u 확인. 사용자 결정: 초기 설정을 T21과 나눠 T30으로 | 기기 작업 전. 네트워크, 다시 설치 여부, 업그레이드 범위는 착수 때 정함 | T30 착수(보드 연결) |
 | 2026-11-10 | T21 준비 | 완료 | 사용자 결정: 기기는 사용자가 보관, OS는 Ubuntu 24.04, Node 22·PostgreSQL 16 설치 계획 그대로. audio-stack `main`(`7ee28fa`)의 문서(`PROTOCOL.md`, `INTEGRATION-WEB.md`, `audiostack.conf`)와 데몬 코드(`daemon.cpp`)를 대조해 앱이 쓰는 부분(백엔드 POST 3개, 재전송, `ctrl.sock`, 세션 시작·교체·종료)이 같음을 확인. `project-overview.md`, `T19.md`, `d4-stt-questions.md`의 OS·기기 줄 갱신, 로컬 `CLAUDE.md` 갱신(사용자 승인). 코드 변경 없음 | 차이 2개(시각 'segment-relative' 문구, 대기열이 찼을 때 재전송 항목이 세지 않고 사라짐). 기기에서 데몬을 돌릴 때 `audiostack.conf` 경로 세 줄을 `/api/device/sessions`로 바꿔야 함(T26). 착수 전 결정: 웹앱 제공 방법. `main`에 병합, push 안 함 | T21 지침서(웹앱 제공 방법 결정) |
 | 2026-11-10 | T20 | 완료 | 브랜치 `feat/t20-device-ingest`에서 web-app PR #1(`7b0c408`)을 병합 커밋 `b6c6eb6`으로 넣고 고칠 점 3개를 커밋: 중단 표시 '중단됨'(`2c1cf54`), 기기 `/end`가 실패하면 세션을 남겨 다시 닫음(`aaa77f8`), 끊긴 사이에 다른 녹음이 시작되면 녹음 화면에서 이어 보임(`cbc9fdf`). 완료 기준 통과: typecheck, 테스트 42개, 웹 빌드, `003` 적용, fleurs 5 = 화면 5 = psql 5, mock 중 기기 세션에서 웹이 새 세션(#58)을 이어 보임, curl 20단계(14가 이제 `503`, DB가 돌아오면 `ended`와 final 저장). 문서: `project-overview.md` '기기 결과 수신 경로' 절, `T19.md` 진행 표, `T20.md` '결과'. 지침서와 다른 점: 같은 뜻의 주석 2곳(`session.ts`, `HistoryListPage.tsx`)도 고침 | push와 PR #1 '병합됨' 확인(박지윤에게 먼저 알림), T29 시험 자원 정리(사용자 확인), 수신 경로 이름은 하드웨어 동의 대기. 커밋하고 `main`에 병합(fast-forward), push 안 함 | T21 착수 전 결정(웹앱 제공 방법), 김범수 답 받기 |
