@@ -98,8 +98,10 @@ export class DeviceIngest {
     if (this.current?.deviceId !== deviceId) return { status: 200, body: { ignored: `모르는 기기 세션 ${deviceId}` } };
 
     const { sessionId } = this.current;
-    this.current = undefined;
+    // 종료가 성공한 뒤에 비운다. DB 장애로 실패하면(503) 그대로 두어, 데몬이 다시 보낸 /end가 종료를 다시 시도하게 한다.
+    // 그동안 세션은 녹음 중으로 남고, DB가 돌아오면 밀린 final을 쓴 뒤 ended로 닫힌다.
     if (this.sessions.getActive()?.id === sessionId) await this.sessions.stop(sessionId);
+    if (this.current?.deviceId === deviceId) this.current = undefined;
     return accepted({ sessionId }, 200);
   }
 
