@@ -88,6 +88,25 @@ export function RecordPage() {
     return () => controller.abort();
   }, [checkActive]);
 
+  // 녹음하고 있지 않은 동안 2초마다 서버에 진행 중인 녹음이 있는지 본다.
+  // 기기(물리 버튼, audiostackd)가 시작한 녹음은 서버가 웹에 알려 주지 않으므로 이렇게 알아챈다 (T20).
+  const idle = phase.kind === 'idle';
+  useEffect(() => {
+    if (!idle) return;
+    const controller = new AbortController();
+    const timer = setInterval(() => {
+      void getActiveSession(controller.signal)
+        .then((session) => {
+          if (session && !controller.signal.aborted) setPhase({ kind: 'recording', session });
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      clearInterval(timer);
+      controller.abort();
+    };
+  }, [idle]);
+
   async function handleStart() {
     setNotice(null);
     setPhase({ kind: 'starting' });

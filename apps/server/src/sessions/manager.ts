@@ -56,7 +56,8 @@ export class SessionManager {
     return this.active?.session ?? null;
   }
 
-  async start(): Promise<Session> {
+  // 기기 세션(T20)은 adapter와 기기 세션 번호를 준다. 웹 버튼은 아무것도 주지 않는다.
+  async start(options: { adapter?: SttAdapter; deviceSessionId?: string } = {}): Promise<Session> {
     if (this.state !== 'idle') {
       throw new HttpError(409, 'SESSION_ALREADY_ACTIVE', '이미 진행 중인 세션이 있습니다');
     }
@@ -65,10 +66,10 @@ export class SessionManager {
     try {
       // 메모리에 진행 중인 세션이 없으므로, DB에 녹음 중으로 남은 행은 닫지 못한 세션이다.
       await this.recover();
-      const session = await insertSession(this.pool);
+      const session = await insertSession(this.pool, options.deviceSessionId);
       const active: ActiveSession = {
         session,
-        adapter: this.createAdapter(),
+        adapter: options.adapter ?? this.createAdapter(),
         adapterStopped: false,
         writer: new SegmentWriter(this.pool, session.id),
         subscribers: new Set(),
@@ -136,6 +137,11 @@ export class SessionManager {
 
   // 서버를 끌 때 부른다. 진행 중인 세션이 있으면 STT를 멈추고 중단으로 닫는다.
   async shutdown(): Promise<void> {
+    await this.interruptActive('서버 종료');
+  }
+
+  // 진행 중인 세션을 중단으로 닫는다. 서버 종료, 또는 기기가 새 세션을 시작했을 때(T20) 부른다.
+  async interruptActive(reason: string): Promise<void> {
     const active = this.active;
     if (!active) return;
 
@@ -154,7 +160,7 @@ export class SessionManager {
     }
     await closeSession(this.pool, active.session.id, 'interrupted');
     console.log(
-      `[session] #${active.session.id} 중단 (서버 종료) - partial ${active.partialCount}개, final ${active.finalCount}개, 저장 ${active.writer.savedCount}개`,
+      `[session] #${active.session.id} 중단 (${reason}) - partial ${active.partialCount}개, final ${active.finalCount}개, 저장 ${active.writer.savedCount}개`,
     );
   }
 
