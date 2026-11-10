@@ -30,7 +30,7 @@ AI 요약, 화자 분리, 검색, 배터리 내장 휴대형, 모드 전환(일�
 
 ```mermaid
 flowchart LR
-  audio["오디오 입력<br/>(형식 미정, D4)"] --> stt["STT<br/>(지금은 mock)"]
+  audio["오디오 입력<br/>(형식 미정, D4)"] --> stt["STT<br/>(mock 또는 기기 엔진)"]
   stt -->|SttEvent| adapter["SttAdapter"]
   adapter --> server["서버"]
   server -->|"SSE: partial, final"| web["웹앱"]
@@ -40,11 +40,11 @@ flowchart LR
 
 | 구성 요소 | 위치 | 역할 | 상태 |
 | --- | --- | --- | --- |
-| STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 기본 구현체는 mock. `STT_MODE=local`이면 노트북에서 실제 모델 엔진을 띄우는 실험용 구현체 (T28) |
-| 실제 STT | AI 파트 `stt-engine` 저장소 (비공개) | 기기 안에서 음성을 인식합니다. `audiostackd`에게서 오디오를 받아 결과를 돌려주고, 데몬이 결과를 서버로 보냅니다 | 엔진은 보드 NPU에서 동작함(AI 파트, 2026-11-09). 서버 연동은 T19 합의 뒤 T20이며, 박지윤이 올린 초안 PR(web-app #1)을 검토하는 중. 노트북에서는 같은 공개 모델을 저장소 밖 엔진으로 붙여 확인함 (T28 실험) |
-| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11) |
+| STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 웹 '녹음 시작'은 `STT_MODE`로 고른 구현체를 씀: 기본 mock, `local`이면 노트북에서 실제 모델 엔진을 띄우는 실험용 구현체 (T28). 기기가 세션을 시작하면 기기 결과를 받는 `DeviceSttAdapter`를 씀 (T20) |
+| 실제 STT | AI 파트 `stt-engine` 저장소 (비공개) | 기기 안에서 음성을 인식합니다. `audiostackd`에게서 오디오를 받아 결과를 돌려주고, 데몬이 결과를 서버로 보냅니다 | 엔진은 보드 NPU에서 동작함(AI 파트, 2026-11-09). 서버는 데몬이 보낸 결과를 `/api/device/sessions`로 받아 세션에 넣음 (T20, 박지윤의 web-app PR #1 병합). 노트북에서 ONNX 엔진과 `feed_wav.py`로 웹 자막, DB, 히스토리, 내보내기까지 확인함 (T29, T20). 실제 데몬과 보드에서는 T26에서 확인. 수신 경로 이름은 하드웨어 파트 동의가 남음 (T19) |
+| 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11). 기기 결과 수신 경로 `/api/device/sessions` (T20) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
-| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음하지 않는 동안 2초마다 진행 중인 녹음 확인 (T20). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS`, `ExportFormat`, `EXPORT_FORMATS` |
 
 ## 기술 결정
@@ -93,15 +93,20 @@ speech-transcriber/
 │  ├─ server/                 # @app/server — Node.js 백엔드
 │  │  ├─ migrations/
 │  │  │  ├─ 001_init.sql      # 스키마 v0 (sessions, segments)
-│  │  │  └─ 002_session_status.sql  # sessions.status 컬럼
+│  │  │  ├─ 002_session_status.sql  # sessions.status 컬럼
+│  │  │  └─ 003_device_session.sql  # sessions.device_session_id 컬럼 (T20)
 │  │  └─ src/
 │  │     ├─ index.ts          # 진입점 (listen, 남은 세션 정리, 종료 처리)
-│  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, 404·에러 처리)
+│  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, /api/device/sessions, 404·에러 처리)
 │  │     ├─ config/
 │  │     │  └─ env.ts         # 환경변수 로더 (STT_MODE와 실험용 엔진 경로 포함)
 │  │     ├─ db/
 │  │     │  ├─ pool.ts        # pg 연결 풀
 │  │     │  └─ migrate.ts     # 마이그레이션 실행 스크립트
+│  │     ├─ device/           # 기기(audiostackd) 결과 수신 (T20, web-app PR #1)
+│  │     │  ├─ routes.ts      # 수신 경로 3개. 2xx나 503으로만 답함
+│  │     │  ├─ ingest.ts      # 기기 세션을 서버 세션에 잇기 (세션 교체, 늦은 final 30초)
+│  │     │  └─ convert.ts     # 기기 결과 한 건을 SttEvent로 (segmentId, 시각, 빈 final 버림)
 │  │     ├─ export/
 │  │     │  └─ format.ts      # 히스토리 내보내기 포매터 (txt, md). 시각·길이·상태 표시는 shared의 format.ts
 │  │     ├─ http/
@@ -118,6 +123,7 @@ speech-transcriber/
 │  │        ├─ adapter.ts     # SttAdapter 인터페이스
 │  │        ├─ mock.ts        # MockSttAdapter
 │  │        ├─ local.ts       # LocalSttAdapter (T28 실험, 실제 모델 엔진을 자식 프로세스로 실행)
+│  │        ├─ device.ts      # DeviceSttAdapter (T20, 수신 경로가 넣은 결과를 세션에 전달)
 │  │        └─ demo.ts        # mock 이벤트 확인용 스크립트
 │  └─ web/                    # @app/web — React 웹앱
 │     ├─ index.html           # 웹앱 HTML (#root)
@@ -151,11 +157,12 @@ speech-transcriber/
 │        └─ stt.ts            # SttEvent 타입
 └─ docs/
    ├─ project-overview.md     # 이 문서
+   ├─ device-ingest.md        # 보드 없이 Mac에서 기기 연동을 시험하는 방법 (web-app PR #1)
    ├─ guides/                 # 작업별 지침서 (Txx.md)
    └─ logs/                   # 일자별 작업 기록 (YYYY-MM-DD.md)
 ```
 
-단위 테스트는 테스트하는 파일 옆에 `*.test.ts`로 둡니다(T17). 지금은 `packages/shared/src/format.test.ts`, `apps/server/src/export/format.test.ts`, `apps/server/src/sessions/routes.test.ts`·`manager.test.ts`, `apps/web/src/api/useSessionStream.test.ts` 다섯 개입니다.
+단위 테스트는 테스트하는 파일 옆에 `*.test.ts`로 둡니다(T17). 지금은 `packages/shared/src/format.test.ts`, `apps/server/src/export/format.test.ts`, `apps/server/src/sessions/routes.test.ts`·`manager.test.ts`, `apps/server/src/device/convert.test.ts`(T20), `apps/web/src/api/useSessionStream.test.ts` 여섯 개입니다.
 
 ## 실행 방법
 
@@ -208,6 +215,8 @@ npm run dev:server
 | --- | --- |
 | 웹에서 종료 성공 | `/history/:id`로 이동 (종료 응답과 스트림의 `ended` 중 먼저 온 쪽에서 한 번만) |
 | 밖에서 종료(기기 버튼, 다른 탭) | 스트림의 `ended`를 받고 `/history/:id`로 이동 (T14) |
+| 밖에서 시작(기기 버튼, 다른 탭) | 녹음하지 않는 동안 2초마다 진행 중인 녹음을 확인해, 2초 안에 `녹음 중`으로 바뀜 (T20) |
+| 웹 버튼 녹음 중 기기가 새 세션을 시작함 | 서버가 웹 버튼 세션을 `interrupted`로 닫음. 끊김 배너가 잠깐 보인 뒤 같은 화면에 새 녹음과 `#5 녹음이 끝나, 진행 중인 녹음(#6)을 보여 줍니다`. 새 녹음이 끝나면 `/history/6` (T20) |
 | 시작했는데 이미 녹음 중 (`409`) | 진행 중인 녹음을 다시 확인해 보여 주고 `이미 진행 중인 녹음이 있어 그 녹음을 보여 줍니다` |
 | 종료했는데 이미 끝남 (`409`, `404`) | 다시 확인하고 `이미 끝난 녹음입니다 (#12)` |
 | 시작·종료 중 DB가 꺼짐 (`503`) | `녹음을 시작하지 못했습니다: DB에 연결하지 못했습니다`, 또는 `녹음을 종료하지 못했습니다: … 잠시 뒤 다시 종료해 주세요`. 종료 실패 때는 녹음 중으로 남아 다시 누를 수 있음 |
@@ -234,17 +243,17 @@ npm run dev:server
 | 시도가 실패함 | 시도 번호가 늘고, 다음 시도까지 1, 2, 4, 8초, 그 뒤로는 10초마다 기다림. 횟수 제한 없음. 세션 확인은 5초 안에 답이 없으면 실패로 봄 |
 | '지금 다시 연결' | 기다리던 시도를 바로 함 |
 | 다시 연결됨 | `다시 연결되었습니다`를 3초 보이고 숨김. 서버가 지금까지의 final을 다시 보내 빠진 문장이 채워짐(같은 번호는 덮어써서 줄이 늘지 않음). 위쪽 서버 상태도 다시 확인 |
-| 끊긴 사이에 녹음이 끝남(기기 버튼, curl) 또는 서버가 다시 켜져 `interrupted`로 닫힘 | 다음 시도에서 `/history/:id`로 이동 |
+| 끊긴 사이에 녹음이 끝남(기기 버튼, curl) 또는 서버가 다시 켜져 `interrupted`로 닫힘 | 다음 시도에서 `/history/:id`로 이동. 다만 그때 다른 녹음이 진행 중이고 '녹음 종료'를 누른 것이 아니면, 히스토리로 가지 않고 그 녹음을 이어 보임 (T20) |
 
 다시 연결을 `EventSource` 기본 동작에 맡기지 않는 이유는 '실시간 스트림' 절에 있습니다.
 
-화면을 연 뒤 다른 탭이나 기기 버튼으로 시작한 녹음은 새로고침하거나 버튼을 눌러 409를 받을 때 반영됩니다. 녹음 중에 밖에서 종료한 것은 스트림의 `ended`로 바로 반영됩니다. 바로 알아채는 방법(폴링 또는 알림 스트림)은 D4 협의 뒤에 정합니다. 흐른 시간은 서버의 시작 시각과 브라우저 시계로 계산하므로 두 시계가 다르면 어긋납니다.
+화면을 연 뒤 다른 탭이나 기기 버튼으로 시작한 녹음은 2초마다 `GET /api/sessions/active`로 확인해 반영합니다(T20). 녹음 중에 밖에서 종료한 것은 스트림의 `ended`로 바로 반영됩니다. 기기 세션 교체(`ended`)로 끝나면 지금은 새 세션을 따라가지 않고 히스토리로 갑니다(T27에서 다시 봄). 흐른 시간은 서버의 시작 시각과 브라우저 시계로 계산하므로 두 시계가 다르면 어긋납니다.
 
 히스토리 화면(T16)은 지난 녹음을 보고 내려받는 곳입니다. 시작 시각, 길이, 상태, 문장 앞 시각은 내보내기 파일과 같은 함수(`packages/shared/src/format.ts`)로 써서, 화면과 내려받은 파일의 내용이 같습니다.
 
 | 화면 | 보이는 것 |
 | --- | --- |
-| 목록 | `지난 녹음 N개`와 항목. 첫 줄 `#45 · 2026-10-23 09:53 · 문장 7개`(서버가 꺼져 끊긴 세션은 끝에 `중단됨 (서버가 꺼져 끊김)`), 둘째 줄 첫 문장을 한 줄로 자름. 녹음이 없으면 `지난 녹음이 없습니다` |
+| 목록 | `지난 녹음 N개`와 항목. 첫 줄 `#45 · 2026-10-23 09:53 · 문장 7개`(중단된 세션은 끝에 `중단됨`), 둘째 줄 첫 문장을 한 줄로 자름. 녹음이 없으면 `지난 녹음이 없습니다` |
 | 상세 | `시작 2026-10-23 09:53 · 길이 6초 · 종료됨`, 'txt 내려받기'·'md 내려받기' 버튼, `[00:03] 문장`을 한 줄씩. 문장이 없으면 `저장된 문장이 없습니다` |
 | 상세, 녹음 중인 세션 | 그때까지 저장된 문장. 버튼은 눌리지 않고 `녹음 중이라 아직 내려받을 수 없습니다`와 녹음 화면 링크. 주소로 직접 열 때만 생김 |
 | 내려받기 | 내보내기 API를 `fetch`로 받아 서버가 정한 이름(`session-45.txt`)으로 저장. 받는 동안 누른 버튼이 `받는 중…` |
@@ -281,8 +290,8 @@ const sessions = useApiData((signal) => listSessions(signal), []);
 | `status` | 뜻 |
 | --- | --- |
 | `recording` | 녹음 중. `endedAt`이 `null`입니다 |
-| `ended` | 사용자가 종료했습니다 |
-| `interrupted` | 사용자가 종료하지 않았는데 끊겼습니다. 녹음 중에 서버를 끄면 이 상태로 닫히고, 서버가 강제로 꺼져 닫지 못한 세션은 서버를 다시 켤 때 이 상태로 닫힙니다 |
+| `ended` | 사용자나 기기가 종료했습니다. 기기의 `/end`와 기기 세션 교체도 이 상태로 닫힙니다 |
+| `interrupted` | 사용자가 종료하지 않았는데 끊겼습니다. 녹음 중에 서버를 끄면 이 상태로 닫히고, 서버가 강제로 꺼져 닫지 못한 세션은 서버를 다시 켤 때 이 상태로 닫힙니다. 웹 버튼으로 시작한 세션은 기기가 새 세션을 시작해도 이 상태로 닫힙니다(T20). 화면과 내보낸 파일에는 이유 없이 `중단됨`으로 보입니다 |
 
 ```bash
 curl -X POST localhost:3000/api/sessions          # 시작
@@ -290,7 +299,23 @@ curl localhost:3000/api/sessions/active           # 진행 중인 세션
 curl -X POST localhost:3000/api/sessions/1/stop   # 종료 (1은 시작할 때 받은 id)
 ```
 
-물리 버튼으로 녹음을 시작하는 경로와, 정지한 뒤 마지막 final을 기다리는 단계는 D4 협의에서 정해지면 추가합니다.
+기기(물리 버튼)로 시작한 녹음은 아래 '기기 결과 수신 경로'로 들어옵니다. 웹 버튼으로 기기 녹음을 시작·종료하는 일은 T27(`ctrl.sock`)에서 합니다.
+
+## 기기 결과 수신 경로
+
+기기의 데몬(`audiostackd`)이 세션 통지와 엔진 결과를 HTTP로 보내는 곳입니다(T20, 박지윤의 web-app PR #1). 인식은 기기에서 하고, 서버는 받은 결과를 `DeviceSttAdapter`로 세션에 넣어 웹 자막, DB, 히스토리, 내보내기로 잇습니다. 형식과 변환 규칙은 [`T19.md`](guides/T19.md) '수신 경로'와 '결과를 `SttEvent`로 바꾸는 규칙', 보드 없이 시험하는 방법은 [`device-ingest.md`](device-ingest.md)에 있습니다. 경로 이름은 하드웨어 파트 동의가 남았습니다(T19).
+
+| 요청 | 하는 일 | 응답 |
+| --- | --- | --- |
+| `POST /api/device/sessions` `{ session_id, … }` | 기기 세션을 서버 세션(정수 번호)에 잇습니다 | `201`과 `sessionId`. 같은 통지를 다시 받으면 `201` `already known` |
+| `POST /api/device/sessions/:deviceId/transcripts` `{ seq, transcript }` | 결과 한 건을 `SttEvent`로 바꿔 세션에 넣습니다 | `202`와 `segmentId`. 버린 것은 `202`와 `ignored`(이미 받은 `seq`, 빈 final, 모르는 `type`, 모르는 기기 세션 등) |
+| `POST /api/device/sessions/:deviceId/end` | 세션을 `ended`로 닫습니다 | `200`. 모르는 기기 세션도 `200` |
+
+- **데몬은 2xx가 아니면 같은 요청을 맨 앞에 두고 계속 다시 보냅니다.** 그래서 서버는 2xx나 DB 장애의 `503` `DB_UNAVAILABLE`로만 답합니다. 본문이 JSON이 아니면 `400`입니다(알려진 것).
+- **웹 버튼 세션이 진행 중일 때 기기 세션이 시작되면** 웹 버튼 세션을 `interrupted`로 닫고 기기 세션을 받습니다.
+- **기기가 세션을 바꾸면**(`session rotate`) 앞 세션을 `ended`로 닫고, 그 기기 세션의 늦은 final을 30초 동안 DB에만 저장합니다(partial은 버림).
+- **`/end`가 DB 장애로 실패하면** 세션을 녹음 중으로 남겨, 데몬이 다시 보낸 `/end`가 종료를 다시 시도합니다. DB가 돌아오면 밀린 final을 쓴 뒤 `ended`로 닫힙니다(T20).
+- 시험: 서버만 띄우고 curl로 데몬을 흉내 낸 20단계와 그 결과는 [`T20.md`](guides/T20.md) '결과'에 있습니다.
 
 ## 실시간 스트림 (SSE)
 
@@ -383,11 +408,11 @@ curl -OJ 'localhost:3000/api/sessions/7/export?format=md'   # session-7.md로 �
 
 ## DB 스키마
 
-스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 `002_session_status.sql`까지 있습니다.
+스키마는 `apps/server/migrations/`의 SQL 파일로 관리합니다. 바꿀 때는 다음 번호의 파일을 추가하고, 이미 적용한 파일은 고치지 않습니다. 지금은 `003_device_session.sql`까지 있습니다.
 
 | 테이블 | 컬럼 | 담는 것 |
 | --- | --- | --- |
-| `sessions` | `id`, `started_at`, `ended_at`, `status` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수입니다. `status`는 `recording`, `ended`, `interrupted` 중 하나이고, `recording`인 행만 `ended_at`이 비어 있습니다 |
+| `sessions` | `id`, `started_at`, `ended_at`, `status`, `device_session_id` | 녹음 세션 하나가 한 행입니다. `id`는 자동으로 증가하는 정수입니다. `status`는 `recording`, `ended`, `interrupted` 중 하나이고, `recording`인 행만 `ended_at`이 비어 있습니다. `device_session_id`는 기기가 만든 세션 번호이고 웹 버튼으로 만든 세션은 비어 있습니다(T20, 겹치지 않음) |
 | `segments` | `session_id`, `segment_id`, `text`, `start_ms`, `end_ms` | final 이벤트 하나가 한 행입니다. 기본 키는 `(session_id, segment_id)`이고, 세션을 지우면 함께 지워집니다. 같은 키의 final이 다시 오면 나중 값으로 덮어씁니다 |
 | `schema_migrations` | `name`, `applied_at` | 적용한 마이그레이션 파일 이름. 실행 스크립트가 관리합니다 |
 
@@ -510,12 +535,13 @@ await adapter.stop();
 - **초안에 없는 값이 있습니다.** 세션 ID, 화자 구분, 인식 신뢰도, 언어는 이벤트에 없습니다. 세션과 이벤트는 서버가 묶습니다(T06). 서버가 세션마다 어댑터를 새로 만들고, 그 어댑터가 준 이벤트를 그 세션의 것으로 봅니다. 나머지는 D4 협의에서 정합니다.
 - **final이 오지 않은 세그먼트는 저장되지 않습니다.** 문장 중간에 녹음을 종료하면 mock에서는 그 문장이 DB에 없습니다. 실제 엔진은 세션 종료를 받으면 말하던 구간을 final로 내고 끝 신호(`session_done`)를 보냅니다(2026-11-09 확인). 데몬이 그 신호를 받은 뒤 세션 종료를 서버에 보내도록 고치는 PR(audio-stack #1)은 아직 병합 전입니다.
 - **오디오를 넘기는 방법은 인터페이스에 없습니다.** `SttAdapter.start`는 이벤트 핸들러만 받습니다. 오디오 입력 형식이 D4에서 정해지면 인자가 바뀔 수 있습니다.
-- **노트북 실험용 구현체가 있습니다(T28).** `STT_MODE=local`이면 `LocalSttAdapter`가 세션마다 저장소 밖 Python 엔진을 띄워, WAV를 실제 말하는 속도로 받아쓴 결과를 표준 출력의 JSON 줄로 받습니다. `segmentId`는 어댑터가 붙이고, `startMs`·`endMs`는 오디오 길이로 셉니다. 녹음을 끝내면 엔진이 말하던 구간을 final로 내고 끝나므로 마지막 문장도 저장됩니다. 다시 받아쓴 partial에는 엉뚱한 문장이 섞일 수 있습니다. 최종 연동 방식은 T19 합의 뒤 T20에서 정하며, 자세한 내용은 [`T28.md`](guides/T28.md)에 있습니다.
+- **노트북 실험용 구현체가 있습니다(T28).** `STT_MODE=local`이면 `LocalSttAdapter`가 세션마다 저장소 밖 Python 엔진을 띄워, WAV를 실제 말하는 속도로 받아쓴 결과를 표준 출력의 JSON 줄로 받습니다. `segmentId`는 어댑터가 붙이고, `startMs`·`endMs`는 오디오 길이로 셉니다. 녹음을 끝내면 엔진이 말하던 구간을 final로 내고 끝나므로 마지막 문장도 저장됩니다. 다시 받아쓴 partial에는 엉뚱한 문장이 섞일 수 있습니다. 자세한 내용은 [`T28.md`](guides/T28.md)에 있습니다. 기기 연동은 위 '기기 결과 수신 경로'(T20)입니다.
 
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 기기 결과 수신 경로 병합과 시험은 [`T20.md`](guides/T20.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md), 노트북 실제 모델 시험은 [`T29.md`](guides/T29.md)
+- [`docs/device-ingest.md`](device-ingest.md): 보드 없이 Mac에서 기기 연동을 시험하는 방법
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록과 답
 - [`stt-engine` `ENGINE_CONTRACT.md`](https://github.com/khu-cse-capstone-26h2-transcriber/stt-engine/blob/main/ENGINE_CONTRACT.md): AI 파트가 정한 엔진 결과 형식과 세션 처리 규칙 (비공개 저장소)
 - [`audio-stack` `docs/PROTOCOL.md`](https://github.com/khu-cse-capstone-26h2-transcriber/audio-stack/blob/main/docs/PROTOCOL.md): 데몬과 엔진 사이 프로토콜, 데몬이 백엔드로 보내는 요청
