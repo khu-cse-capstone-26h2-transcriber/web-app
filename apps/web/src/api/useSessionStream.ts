@@ -6,7 +6,13 @@
 // 그 응답 코드도 알려 주지 않는다. 그래서 끊기면 스트림을 닫고, 잠시 뒤 진행 중인 세션을 물어본 다음
 // 같은 세션이 아직 녹음 중일 때만 새로 연다. 새 EventSource는 Last-Event-ID를 보내지 않아 final을 처음부터
 // 다시 받지만, 같은 segmentId는 덮어쓰므로 줄이 늘지 않는다.
-import { STREAM_HEARTBEAT_MS, type SessionStreamMessage, type SttEvent } from '@app/shared';
+// 그때 다른 세션이 진행 중이면(끊긴 사이에 기기가 새 세션을 시작함 등) 그 세션을 onEnded에 함께 넘긴다(T20).
+import {
+  STREAM_HEARTBEAT_MS,
+  type Session,
+  type SessionStreamMessage,
+  type SttEvent,
+} from '@app/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveSession } from './endpoints';
 
@@ -23,7 +29,7 @@ function retryDelayMs(attempt: number): number {
 export interface TranscriptState {
   // 확정된 문장. segmentId 순서다.
   finals: SttEvent[];
-  // 지금 말하는 중인 문장. 같은 segmentId의 final이 오면 비운다.
+  // 지금 말하는 중인 문장. 그 segmentId 이상의 final이 오면 비운다.
   partial: SttEvent | null;
 }
 
@@ -59,16 +65,19 @@ export function applyMessage(state: TranscriptState, message: SttEvent): Transcr
     if (state.finals.some((f) => f.segmentId === message.segmentId)) return state;
     return { ...state, partial: message };
   }
+  // partial의 segmentId는 서버가 다음 final에 붙일 번호다. 그래서 같은 번호의 final이 오면 그 문장이 확정된 것이다.
+  // 뒤 번호의 final이 와도 비워, 끊겼다가 final을 다시 받을 때 지난 partial이 남지 않게 한다.
   const partial =
     state.partial && state.partial.segmentId <= message.segmentId ? null : state.partial;
   return { finals: upsertFinal(state.finals, message), partial };
 }
 
 // sessionId가 null이면 구독하지 않는다.
-// 세션이 끝나면(ended를 받았거나, 끊긴 사이에 끝났으면) 스트림을 닫고 onEnded(sessionId)를 부른다.
+// 세션이 끝나면(ended를 받았거나, 끊긴 사이에 끝났으면) 스트림을 닫고 onEnded(sessionId, next)를 부른다.
+// next는 끊긴 사이에 끝났을 때 확인한 진행 중인 세션이다. 다른 세션이 진행 중이 아니거나 ended를 받았으면 null이다.
 export function useSessionStream(
   sessionId: number | null,
-  onEnded: (sessionId: number) => void,
+  onEnded: (sessionId: number, next: Session | null) => void,
 ): SessionStream {
   const [transcript, setTranscript] = useState<TranscriptState>(EMPTY);
   const [connection, setConnection] = useState<StreamConnection>({ status: 'connecting' });
@@ -101,11 +110,11 @@ export function useSessionStream(
       check = null;
     }
 
-    // 세션이 끝났다. 더 다시 연결하지 않는다.
-    function finish() {
+    // 세션이 끝났다. 더 다시 연결하지 않는다. next는 그때 진행 중인 다른 세션이다.
+    function finish(next: Session | null = null) {
       halt();
       reconnectNowRef.current = null;
-      onEndedRef.current(id);
+      onEndedRef.current(id, next);
     }
 
     // 무소식 타이머를 다시 건다. 스트림을 열 때와 무언가 받을 때마다 부른다.
@@ -159,7 +168,7 @@ export function useSessionStream(
             if (check !== controller) return;
             check = null;
             if (active?.id === id) open();
-            else finish();
+            else finish(active);
           },
           () => {
             // 서버에 닿지 못했거나 답이 늦었다. 취소된 요청이면 아무것도 하지 않는다.

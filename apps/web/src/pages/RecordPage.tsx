@@ -1,8 +1,10 @@
 // 녹음 화면 ('/'). 진행 중인 녹음의 상태를 보여 주고, 웹에서도 녹음을 시작·종료할 수 있게 한다.
 // 녹음의 주 제어는 기기의 물리 버튼이고, 이 화면의 버튼은 개발·시연·원격 종료용 보조 수단이다.
-// 화면을 연 뒤 물리 버튼으로 시작한 녹음은 새로고침해야 보인다. 알아채는 방법은 D4 협의 뒤에 정한다.
+// 녹음하지 않는 동안 2초마다 진행 중인 녹음을 확인해, 기기 버튼으로 시작한 녹음도 새로고침 없이 보인다(T20).
 // 녹음 중에는 버튼 아래에 실시간 자막(T14)을 보인다. 어디서 끝냈든 녹음이 끝나면 히스토리 상세로 간다.
 // 자막 스트림이 끊기면 맨 위에 배너를 띄우고 다시 연결한다(T15). 끊긴 사이에 끝났어도 히스토리 상세로 간다.
+// 다만 끊긴 사이에 다른 녹음이 시작됐으면(기기 세션이 웹 버튼 녹음을 중단시킴 등) 그 녹음을 이어 보인다(T20).
+// '녹음 종료'를 누른 뒤에는 늘 히스토리 상세로 간다.
 import type { Session } from '@app/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router';
@@ -60,9 +62,21 @@ export function RecordPage() {
     [navigate],
   );
 
+  // 스트림이 녹음이 끝났다고 알릴 때 부른다. useSessionStream이 최신 함수를 쓰므로 지금 phase를 읽을 수 있다.
+  function handleEnded(sessionId: number, next: Session | null) {
+    if (next && phase.kind !== 'stopping') {
+      // 끊긴 사이에 이 녹음이 끝나고 다른 녹음이 시작됐다. 히스토리로 가지 않고 그 녹음을 보인다.
+      // 웹은 왜 끝났는지 모르므로(기기 세션 시작, 서버 재시작 뒤 기기 세션 등) 이유는 쓰지 않는다.
+      setNotice(`#${sessionId} 녹음이 끝나, 진행 중인 녹음(#${next.id})을 보여 줍니다`);
+      setPhase({ kind: 'recording', session: next });
+      return;
+    }
+    goToHistory(sessionId);
+  }
+
   const streamSessionId =
     phase.kind === 'recording' || phase.kind === 'stopping' ? phase.session.id : null;
-  const stream = useSessionStream(streamSessionId, goToHistory);
+  const stream = useSessionStream(streamSessionId, handleEnded);
 
   // 실시간 연결이 다시 이어지면 위쪽 서버 상태도 바로 다시 확인한다.
   const reconnected = stream.connection.status === 'open' && stream.connection.reconnected;
@@ -197,10 +211,7 @@ export function RecordPage() {
       {streamSessionId !== null && <Transcript {...stream.transcript} />}
 
       <p>
-        <small>
-          녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다. 기기 버튼으로 시작한
-          녹음이 보이지 않으면 새로고침해 주세요.
-        </small>
+        <small>녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다.</small>
       </p>
     </section>
   );
