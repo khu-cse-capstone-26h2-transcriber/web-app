@@ -65,7 +65,7 @@ flowchart LR
 | STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
 | 테스트 | Vitest 5, 핵심 로직만(내보내기 포매터, 이벤트 재개, 세그먼트 병합). 루트에서 `npm test` (T17) |
 | 백엔드 위치 | Rubik Pi 안을 목표로 설계. 실측 결과에 따라 SQLite 또는 별도 서버로 바뀔 수 있음 |
-| 기기 OS | Rubik Pi 3에 Ubuntu for Qualcomm (하드웨어 파트 결정). AI 파트가 측정한 보드는 Ubuntu 24.04 (2026-11-09) |
+| 기기 OS | Rubik Pi 3에 Ubuntu 24.04 (2026-11-10 앱 파트 결정, 기기는 앱 파트가 보관). AI 파트가 측정한 보드도 Ubuntu 24.04 (2026-11-09) |
 | STT 엔진 | `seastar105/whisper-small-komixv2`를 QNN으로 변환해 NPU에서 실행. `audiostackd`의 `engine.sock`에 접속하는 별도 프로그램(`stt-engine` 저장소). 결과 형식과 세션 처리 규칙은 `stt-engine`의 `ENGINE_CONTRACT.md` (AI 파트 결정, 2026-11-09) |
 | 엔진 입력 오디오 | 16 kHz 모노 S16_LE를 20 ms(640바이트)씩. 마이크는 `audiostackd`만 열고, 앱 서버는 오디오를 다루지 않음 (하드웨어 파트 구현) |
 | 엔진 결과 처리 | `segmentId`는 서버가 세션마다 0부터 붙임(엔진 `seg_id`는 쓰지 않음). 빈 final(`empty: true`)은 버림. 기기가 세션을 바꾸면 앞 세션을 `ended`로 닫고 늦은 final을 30초 동안 저장 (앱 파트 결정, 2026-11-09, T19) |
@@ -73,7 +73,7 @@ flowchart LR
 아직 정해지지 않은 것은 다음과 같습니다. 결정 번호는 `TODO.md`의 표기입니다.
 
 - STT 연동 방식: 녹음 시작·종료 주체와 세션 번호 발급, 서버의 수신 경로 (D4, 하드웨어 파트 합의가 남음). 엔진 결과 형식과 오디오 형식은 정해짐
-- Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획), 기기 수령 시점 (D5, 하드웨어 파트 협의)
+- Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획) (D5, 하드웨어 파트 협의)
 - 팀 전체 마일스톤과 주차별 일정 (D7)
 - PostgreSQL 메모리 설정, SQLite 전환 여부 (D8, 기기 실측 후)
 
