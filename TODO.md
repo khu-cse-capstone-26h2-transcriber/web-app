@@ -49,6 +49,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 설치: `nvm`으로 Node 22.22.0, Docker 없이 `apt`로 PostgreSQL(Ubuntu 24.04 기본 판은 16으로 개발 환경과 같음) (2026-11-10 사용자 확인)
 - 실행: 기기용 `.env`(비밀번호는 예시 값과 다르게), `npm ci`, `npm run db:migrate`, `npm run dev:server`
 - 착수 전 결정: 웹앱 제공 방법. 지금 Vite는 `localhost`에서만 열립니다. `vite preview --host`로 열지, Express가 `apps/web/dist`를 내보낼지 정합니다.
+- 착수 전 결정: T30에서 보드에 팀 서비스(`audiostack`, `whisper-engine`)가 켜져 있었다면 끌지, 데몬 경로를 `/api/device/sessions`로 바꿀지(기본 `/api/sessions`면 서버를 띄울 때 mock 녹음이 켜짐, `docs/team-questions.md` HW-1)
 - 완료 확인: 노트북 브라우저에서 mock 녹음, 자막, 히스토리까지 동작
 - 측정: 서버와 PostgreSQL의 메모리·CPU, `free -h`, `df -h`
 - 앞선 작업에서 넘어온 확인: listen 주소(T04), 세그먼트 대기열 상한(T08), final 목록 메모리(T09), 시간대 데이터(T11), 웹 빌드 제공(T12), 기기 시계와 쿼리 시간 제한(T13), Node 22 설치(T25)

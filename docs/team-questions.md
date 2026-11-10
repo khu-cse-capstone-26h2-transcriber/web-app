@@ -74,8 +74,8 @@
 
 ## 3. 앱 작업에 주는 의미
 
-- **T30**: 보드 계정은 기본 `ubuntu` 그대로 둡니다. `whisper-engine.service`가 `User=ubuntu`, `WorkingDirectory=/home/ubuntu/rubikpi/runner`로 고정돼 있습니다. 보드에 `~/rubikpi/sdk250`이 있으면 지우지 않습니다(AI-1, AI-2).
-- **T21**: 서버와 PostgreSQL을 잴 때 CPU 클럭 정책(`cat /sys/devices/system/cpu/cpufreq/policy*/scaling_governor`)도 함께 적습니다. AI 파트의 엔진 측정값은 `performance` 기준입니다.
+- **T30**: 보드 계정은 기본 `ubuntu` 그대로 둡니다. `whisper-engine.service`가 `User=ubuntu`, `WorkingDirectory=/home/ubuntu/rubikpi/runner`로 고정돼 있습니다. 보드에 `~/rubikpi/sdk250`이 있으면 지우지 않고, 다시 설치해야 하면 먼저 Mac에 백업합니다(AI-1, AI-2). `audiostack.service`·`whisper-engine.service`가 설치돼 켜져 있는지 확인하고 상태만 기록합니다. 기준값에 CPU 클럭 정책도 적습니다(2026-11-10 `T30.md`에 반영).
+- **T21**: 서버와 PostgreSQL을 잴 때 CPU 클럭 정책(`cat /sys/devices/system/cpu/cpufreq/policy*/scaling_governor`)도 함께 적습니다. AI 파트의 엔진 측정값은 `performance` 기준입니다. T30에서 데몬 서비스가 켜져 있었다면, 서버를 3000번에 띄우기 전에 끌지 경로를 바꿀지 정합니다. 기본 설정 그대로면 데몬이 `/api/sessions`로 보내 mock 녹음이 켜집니다(HW-1).
 - **T26**: 보드에서 `gh auth login`(비공개 저장소의 Release를 받음), 엔진 빌드 패키지(`g++`, `python3-numpy`), 데몬 빌드(`scripts/setup_rubikpi.sh`, `scripts/build.sh`), 엔진 실행 계정의 `audio` 그룹이 필요합니다. 데몬을 띄울 때는 기기의 `/etc/audiostack/audiostack.conf`에서 경로 세 줄을 바꿉니다(설치 스크립트가 이미 있는 설정 파일을 덮어쓰지 않음). WAV 입력 경로 두 가지는 1장에 있습니다.
 - **T27**: 서버를 돌리는 계정을 `audio` 그룹에 넣으면 `ctrl.sock`에 쓸 수 있습니다. 대기 상태, 물리 버튼, 엔진 상태 전달은 HW-2~HW-4의 답이 있어야 합니다.
 
