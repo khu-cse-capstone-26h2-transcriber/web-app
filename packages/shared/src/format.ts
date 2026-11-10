@@ -6,7 +6,7 @@ import type { SessionStatus } from './session';
 export const SESSION_STATUS_LABELS: Record<SessionStatus, string> = {
   recording: '녹음 중',
   ended: '종료됨',
-  interrupted: '중단됨 (서버가 꺼져 끊김)',
+  interrupted: '중단됨',
 };
 
 // 시작 시각은 기기와 브라우저의 시간대 설정과 상관없이 한국 시간으로 쓴다.

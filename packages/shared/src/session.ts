@@ -1,6 +1,6 @@
 // 녹음 세션 타입. 서버의 응답과 웹앱이 같은 타입을 쓴다.
 
-// recording: 녹음 중, ended: 사용자가 종료함, interrupted: 서버가 꺼져서 끊김
+// recording: 녹음 중, ended: 사용자나 기기가 종료함, interrupted: 종료하지 못하고 끊김(서버 종료, 기기 세션 시작)
 export type SessionStatus = 'recording' | 'ended' | 'interrupted';
 
 export interface Session {

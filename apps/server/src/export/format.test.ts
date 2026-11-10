@@ -51,9 +51,9 @@ describe('formatTxt', () => {
     );
   });
 
-  it('서버가 꺼져 끊긴 세션은 상태를 중단됨으로 쓴다', () => {
+  it('중단된 세션은 상태를 중단됨으로 쓴다', () => {
     const body = formatTxt({ ...SESSION, status: 'interrupted' }, SEGMENTS);
-    expect(body).toContain('\n상태: 중단됨 (서버가 꺼져 끊김)\n');
+    expect(body).toContain('\n상태: 중단됨\n');
   });
 });
 

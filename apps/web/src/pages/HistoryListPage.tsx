@@ -6,7 +6,7 @@ import { listSessions } from '../api/endpoints';
 import { useApiData } from '../api/useApiData';
 
 // 목록의 한 항목. 첫 줄에 번호, 시작 시각, 문장 수를, 둘째 줄에 첫 문장을 한 줄로 잘라 보인다.
-// 목록에는 끝난 세션만 오므로, 서버가 꺼져 끊긴 세션에만 상태 이름을 붙인다.
+// 목록에는 끝난 세션만 오므로, 중단된 세션에만 상태 이름을 붙인다.
 function SessionItem({ session }: { session: SessionSummary }) {
   return (
     <li style={{ borderBottom: '1px solid #eee' }}>
