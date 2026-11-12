@@ -53,6 +53,7 @@ flowchart LR
 | --- | --- |
 | 클라이언트 | React 웹앱 |
 | 웹앱 빌드 도구 | Vite. 라우팅은 React Router, 서버 호출은 `fetch` 래퍼. 개발 중에는 Vite 프록시로 서버에 연결 (CORS 없음) |
+| 웹앱 제공 (기기) | 서버(Express)가 웹앱 빌드 `apps/web/dist`를 같은 포트에서 내보냄. 빌드가 있으면 항상 (2026-11-12, T31) |
 | 백엔드 | Node.js + TypeScript, npm workspaces 모노레포 |
 | Node | 22 (`.nvmrc`의 22.22.0). Node 20 지원 종료로 2026-10-30에 올림 (T25) |
 | 서버 프레임워크 | Express |
@@ -97,7 +98,7 @@ speech-transcriber/
 │  │  │  └─ 003_device_session.sql  # sessions.device_session_id 컬럼 (T20)
 │  │  └─ src/
 │  │     ├─ index.ts          # 진입점 (listen, 남은 세션 정리, 종료 처리)
-│  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, /api/device/sessions, 404·에러 처리)
+│  │     ├─ app.ts            # Express 앱 조립 (/health, /api/sessions, /api/device/sessions, 웹앱 빌드, 404·에러 처리)
 │  │     ├─ config/
 │  │     │  └─ env.ts         # 환경변수 로더 (STT_MODE와 실험용 엔진 경로 포함)
 │  │     ├─ db/
@@ -111,7 +112,8 @@ speech-transcriber/
 │  │     │  └─ format.ts      # 히스토리 내보내기 포매터 (txt, md). 시각·길이·상태 표시는 shared의 format.ts
 │  │     ├─ http/
 │  │     │  ├─ errors.ts      # HttpError, 404·에러 처리 미들웨어
-│  │     │  └─ sse.ts         # SSE 응답 하나 (헤더, id 줄, data 한 줄 JSON, heartbeat)
+│  │     │  ├─ sse.ts         # SSE 응답 하나 (헤더, id 줄, data 한 줄 JSON, heartbeat)
+│  │     │  └─ web.ts         # 웹앱 빌드(apps/web/dist) 제공, 화면 주소는 index.html (T31)
 │  │     ├─ segments/
 │  │     │  ├─ repository.ts  # segments 테이블을 읽고 쓰는 SQL
 │  │     │  └─ writer.ts      # 세션의 final을 순서대로 쓰고, 실패하면 다시 시도
@@ -177,6 +179,7 @@ npm run typecheck    # 모든 워크스페이스 타입 검사
 npm test             # 핵심 로직 단위 테스트 (DB와 Docker 없이 돎)
 npm run dev:server   # 서버 실행 (끌 때는 Ctrl+C)
 npm run dev:web      # 웹앱 개발 서버 실행 (http://localhost:5173, 서버도 켜 둠)
+npm run build:web    # 웹앱 빌드 (apps/web/dist). 서버를 켜면 서버 포트에서도 웹앱이 열림 (T31)
 npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 ```
 
@@ -271,7 +274,15 @@ const sessions = useApiData((signal) => listSessions(signal), []);
 // sessions.status: 'loading' | 'success'(data) | 'error'(error: ApiError)
 ```
 
-`npm run build -w @app/web`은 `apps/web/dist`에 정적 파일을 만듭니다. `npm run preview -w @app/web`(`http://localhost:4173`)으로 빌드 결과를 같은 프록시와 함께 볼 수 있습니다. 기기에서 빌드 결과를 누가 내보낼지(Express가 직접 내보낼지 등)는 아직 정하지 않았습니다.
+`npm run build:web`(`npm run build -w @app/web`과 같음)은 `apps/web/dist`에 정적 파일을 만듭니다. `npm run preview -w @app/web`(`http://localhost:4173`)으로 빌드 결과를 같은 프록시와 함께 볼 수 있습니다.
+
+기기에서는 Vite 없이 서버가 이 빌드를 내보냅니다(T31, 2026-11-12). 서버를 켤 때 `apps/web/dist/index.html`이 있으면 `PORT`(예: `http://rubikpi.local:3000`)에서 웹앱과 API를 함께 열고, 없으면 API만 열며 그 사실을 로그로 알립니다. 빌드는 켤 때 한 번만 찾으므로 새로 빌드했으면 서버를 다시 켭니다. 규칙은 다음과 같습니다.
+
+- `/history/12` 같은 화면 주소(`GET`·`HEAD`, `/api`·`/health`가 아니고 확장자가 없는 경로)는 `index.html`을 줍니다. 그래서 어느 화면에서 새로고침해도 됩니다.
+- `assets/` 파일은 이름에 내용 해시가 붙어 1년 캐시(`immutable`)하고, `index.html`은 `no-cache`라 새 빌드를 바로 씁니다.
+- 없는 파일(`/favicon.ico` 등)과 없는 API 경로는 지금처럼 JSON 404입니다.
+
+노트북 개발은 그대로 `npm run dev:web`(5173)을 씁니다. 서버 포트(3000)에서 보이는 웹앱은 마지막으로 빌드한 것이라 코드 변경이 바로 보이지 않습니다.
 
 ## 세션 API
 

@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-11-10
+마지막 갱신: 2026-11-12
 
 ## 오늘의 작업 (2026-11-02) — 실제 모델 연동과 Rubik Pi 올리기 준비
 
@@ -48,11 +48,11 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 네트워크: 서버에 로그인이 없으므로 믿을 수 있는 네트워크에서만 실험
 - 설치: `nvm`으로 Node 22.22.0, Docker 없이 `apt`로 PostgreSQL(Ubuntu 24.04 기본 판은 16으로 개발 환경과 같음) (2026-11-10 사용자 확인)
 - 실행: 기기용 `.env`(비밀번호는 예시 값과 다르게), `npm ci`, `npm run db:migrate`, `npm run dev:server`
-- 착수 전 결정: 웹앱 제공 방법. 지금 Vite는 `localhost`에서만 열립니다. `vite preview --host`로 열지, Express가 `apps/web/dist`를 내보낼지 정합니다.
+- 웹앱 제공: 서버(Express)가 `apps/web/dist`를 같은 포트에서 내보냄(2026-11-12 사용자 결정, T31 완료). 보드에서 `npm run build:web` 뒤 서버를 켜면 `http://rubikpi.local:3000`에서 열림
 - 착수 전 결정: T30에서 보드에 팀 서비스(`audiostack`, `whisper-engine`)가 켜져 있었다면 끌지, 데몬 경로를 `/api/device/sessions`로 바꿀지(기본 `/api/sessions`면 서버를 띄울 때 mock 녹음이 켜짐, `docs/team-questions.md` HW-1)
 - 완료 확인: 노트북 브라우저에서 mock 녹음, 자막, 히스토리까지 동작
 - 측정: 서버와 PostgreSQL의 메모리·CPU, `free -h`, `df -h`
-- 앞선 작업에서 넘어온 확인: listen 주소(T04), 세그먼트 대기열 상한(T08), final 목록 메모리(T09), 시간대 데이터(T11), 웹 빌드 제공(T12), 기기 시계와 쿼리 시간 제한(T13), Node 22 설치(T25)
+- 앞선 작업에서 넘어온 확인: listen 주소(T04, 코드상 모든 인터페이스에서 열림. 기기에서 접속만 확인), 세그먼트 대기열 상한(T08), final 목록 메모리(T09), 시간대 데이터(T11), 기기 시계와 쿼리 시간 제한(T13), Node 22 설치(T25)
 
 ### T26 Rubik Pi에서 모델과 서버 연동 준비
 
@@ -122,7 +122,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 ### 기기 연동
 
 - [ ] T30 Rubik Pi 초기 설정(OS 확인, 네트워크, SSH, 시간) — P0 · 단계 10 · 선행: 없음 · 협의: **[AI]**(다시 설치·업그레이드 전 `~/rubikpi` 확인) · 상태: 지침서 작성(2026-11-10)
-- [ ] T21 Rubik Pi에 서버 올리기와 실측(mock STT, Node, PostgreSQL, 메모리·CPU) — P0 · 단계 10 · 선행: T18, T30 · 협의: **[하드웨어]** (D5) · 순서: T20 뒤 · 상태: 착수 가능(2026-11-10, 기기는 사용자가 보관). 착수 전 결정: 웹앱 제공 방법
+- [x] T31 Express가 웹앱 빌드 내보내기 — P0 · 단계 10 · 선행: T12 · 협의: 없음 · 상태: 완료(2026-11-12)
+- [ ] T21 Rubik Pi에 서버 올리기와 실측(mock STT, Node, PostgreSQL, 메모리·CPU) — P0 · 단계 10 · 선행: T18, T30, T31 · 협의: **[하드웨어]** (D5) · 순서: T20 뒤 · 상태: 착수 가능(2026-11-10, 기기는 사용자가 보관). 착수 전 결정: 팀 서비스 처리(HW-1)
 - [ ] T26 Rubik Pi에서 실제 모델과 서버 연동(WAV 입력) — P0 · 단계 11 · 선행: T20, T21 · 협의: **[AI, 하드웨어]**
 - [ ] T27 하드웨어 파이프라인 연동(`audiostackd`, 마이크, 물리 버튼) — P0 · 단계 12 · 선행: T26 · 협의: **[하드웨어]** · 상태: 보류(내용 파악 뒤 시작)
 
@@ -147,6 +148,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-12 | T31 | 완료 | 기기 테스트 전 남은 개발 정리(꼭 할 것은 웹앱 제공 하나) 뒤 사용자 결정으로 T31 진행. `f02f59e`를 `main`에 fast-forward 병합, `main`에서 `feat/t31-serve-web`. 지침서 `T31.md`(구현 전), `http/web.ts`(빌드가 있으면 `apps/web/dist` 제공, 화면 주소는 `index.html`, `assets/` 긴 캐시), `app.ts`·`index.ts`, 루트 `build:web`. 완료 기준 통과(typecheck, 테스트 42개, curl, LAN 주소 `200`, 브라우저 #66 녹음·자막·새로고침·txt·md, psql 15행, 빌드 없을 때 API만, 5173 그대로). 지침서와 다른 점 없음 | 커밋·push 안 함. 다른 기기 브라우저 확인은 T21 | T30 착수 |
 | 2026-11-10 | 팀 저장소 확인 | 완료 | 브랜치 `docs/team-repo-findings`(`docs/t30-device-setup`에서)에서 조직 저장소를 읽기만 해 확인. `stt-engine` `c8f5bd3`·`audio-stack` `7ee28fa` 그대로, audio-stack PR #1·#2 리뷰 없음, 김범수 답 없음. 물을 것 중 12개는 저장소에서 답을 찾음(`ctrl.sock`은 `root:audio 0660`이라 서버 계정을 `audio` 그룹에 넣으면 됨, `503`·`4xx`는 3초마다 계속 다시 보냄, 대기열이 차면 세션 통지·`/end`도 버려질 수 있음, 엔진이 끊겨도 데몬은 세션 유지, NPU는 `ubuntu` 계정, WAV 경로 두 가지 등). 새 파일 `docs/team-questions.md`, `T19.md`·`T30.md`·`d4-stt-questions.md`·`project-overview.md` 갱신. 데몬·엔진 실행과 코드 변경 없음 | 남은 질문 김범수 8개, 박지윤 7개(새 질문: QNN 런타임 받는 방법, 같은 보드에서 CPU 나누기), 둘 다 1개. 보낼지는 사용자가 정함. 조직 Projects는 토큰 권한(`read:project`)이 없어 못 봄. 커밋하고 `main`에 병합(`bdc34aa`, T30 커밋 포함), push 안 함 | 질문 보내기, T30 착수 |
 | 2026-11-10 | T30 | 진행 중 | 브랜치 `docs/t30-device-setup`에서 지침서 `T30.md` 작성(9단계, 단계별 확인 명령, 2단계 판단 표). Thundercomm 매뉴얼 1.0.0-u 확인. 사용자 결정: 초기 설정을 T21과 나눠 T30으로 | 기기 작업 전. 네트워크, 다시 설치 여부, 업그레이드 범위는 착수 때 정함 | T30 착수(보드 연결) |
 | 2026-11-10 | T21 준비 | 완료 | 사용자 결정: 기기는 사용자가 보관, OS는 Ubuntu 24.04, Node 22·PostgreSQL 16 설치 계획 그대로. audio-stack `main`(`7ee28fa`)의 문서(`PROTOCOL.md`, `INTEGRATION-WEB.md`, `audiostack.conf`)와 데몬 코드(`daemon.cpp`)를 대조해 앱이 쓰는 부분(백엔드 POST 3개, 재전송, `ctrl.sock`, 세션 시작·교체·종료)이 같음을 확인. `project-overview.md`, `T19.md`, `d4-stt-questions.md`의 OS·기기 줄 갱신, 로컬 `CLAUDE.md` 갱신(사용자 승인). 코드 변경 없음 | 차이 2개(시각 'segment-relative' 문구, 대기열이 찼을 때 재전송 항목이 세지 않고 사라짐). 기기에서 데몬을 돌릴 때 `audiostack.conf` 경로 세 줄을 `/api/device/sessions`로 바꿔야 함(T26). 착수 전 결정: 웹앱 제공 방법. `main`에 병합, push 안 함 | T21 지침서(웹앱 제공 방법 결정) |
