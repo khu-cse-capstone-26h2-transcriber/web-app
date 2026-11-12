@@ -3,6 +3,7 @@ import { APP_NAME } from '@app/shared';
 import { createApp } from './app';
 import { loadEnv, maskDbUrl } from './config/env';
 import { createPool } from './db/pool';
+import { createWebRouter, WEB_DIST_DIR } from './http/web';
 import { SessionManager } from './sessions/manager';
 import type { SttAdapter } from './stt/adapter';
 import { LocalSttAdapter } from './stt/local';
@@ -17,7 +18,9 @@ const createAdapter: () => SttAdapter = localStt
   ? () => new LocalSttAdapter(localStt)
   : () => new MockSttAdapter();
 const sessions = new SessionManager(pool, createAdapter);
-const app = createApp(pool, sessions);
+// 웹앱 빌드는 켤 때 한 번만 찾는다. 새로 빌드했으면 서버를 다시 켠다. (T31)
+const web = createWebRouter(WEB_DIST_DIR);
+const app = createApp(pool, sessions, web);
 
 // 서버가 꺼질 때 닫지 못한 세션을 정리한다. DB가 꺼져 있어도 서버는 띄운다.
 try {
@@ -44,6 +47,13 @@ const server = app.listen(env.port, (error?: Error) => {
     `[server] config - PORT=${env.port} DB_URL=${maskDbUrl(env.dbUrl)} STT_URL=${env.sttUrl} STT_MODE=${env.sttMode}`,
   );
   if (localStt) console.log(`[server] local STT - ${localStt.script} (WAV ${localStt.wav})`);
+  if (web) {
+    console.log(`[server] web - 웹앱 빌드를 내보냅니다 (${WEB_DIST_DIR})`);
+  } else {
+    console.log(
+      `[server] web - 빌드가 없어 API만 엽니다 (${WEB_DIST_DIR}). npm run build:web 뒤 서버를 다시 켜면 웹앱도 열립니다`,
+    );
+  }
 });
 
 // 새 요청을 받지 않고, 처리 중인 요청이 끝나면 진행 중인 세션과 DB 풀을 닫고 끝낸다.
