@@ -56,26 +56,45 @@ const server = app.listen(env.port, (error?: Error) => {
   }
 });
 
-// 새 요청을 받지 않고, 처리 중인 요청이 끝나면 진행 중인 세션과 DB 풀을 닫고 끝낸다.
+// 브라우저가 keep-alive 연결을 놓지 않아도 이 시간(ms)이 지나면 남은 연결을 끊는다.
+// systemd 기본 대기 시간(90초)보다 훨씬 짧게 둔다. (T32)
+const FORCE_CLOSE_MS = 5_000;
+
+// 진행 중인 세션을 중단으로 닫는다. 실패해도 종료는 이어 간다.
+function closeSessions(): Promise<void> {
+  return sessions.shutdown().catch((error: unknown) => {
+    console.error('[session] 진행 중인 세션을 닫지 못했습니다:', error);
+  });
+}
+
+// 세션을 먼저 중단하고 새 연결을 받지 않는다. 연결이 모두 닫히면 DB 풀을 닫고 끝낸다.
+// 세션 정리를 server.close 콜백 뒤로 미루면, 끊긴 SSE가 같은 keep-alive 연결로 다시 붙어
+// 서로를 기다리며 멈춘다(T21 찾은 문제 1). 그래서 둘을 함께 시작한다. (T32)
 let shuttingDown = false;
 function shutdown(signal: string): void {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[server] ${signal} 받음, 종료합니다`);
-  server.close(() => {
-    void sessions
-      .shutdown()
-      .catch((error: unknown) => {
-        console.error('[session] 진행 중인 세션을 닫지 못했습니다:', error);
-      })
-      .then(() => pool.end())
-      .then(() => {
-        console.log('[server] 종료 완료');
-        process.exit(0);
-      });
-  });
-  // SSE 연결은 스스로 끝나지 않아, 닫아야 위의 server.close가 끝난다. 웹앱은 알아서 다시 접속을 시도한다.
-  sessions.disconnectSubscribers();
+  // 첫 await 전에 진행 중인 세션을 비우고 SSE 응답을 끝낸다. 그 뒤에 server.close를 불러야
+  // SSE가 쓰던 연결이 쉬는 연결로 보여 바로 닫힌다. 순서를 바꾸지 않는다.
+  const sessionsClosed = closeSessions();
+  // 이미 닫힌 서버면 콜백에 에러가 오지만, 그때도 종료를 이어 간다.
+  const serverClosed = new Promise<void>((resolve) => server.close(() => resolve()));
+  const forceTimer = setTimeout(() => {
+    console.log(`[server] ${FORCE_CLOSE_MS / 1000}초 안에 닫히지 않은 연결을 끊습니다`);
+    server.closeAllConnections();
+  }, FORCE_CLOSE_MS);
+  void Promise.all([sessionsClosed, serverClosed])
+    // 종료 중에 남은 연결로 새 세션이 시작됐을 수 있어(웹 버튼, 기기 통지) 한 번 더 닫는다. DB가 필요해 풀보다 먼저.
+    .then(() => closeSessions())
+    .then(() => {
+      clearTimeout(forceTimer);
+      return pool.end();
+    })
+    .then(() => {
+      console.log('[server] 종료 완료');
+      process.exit(0);
+    });
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));

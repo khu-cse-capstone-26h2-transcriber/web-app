@@ -147,7 +147,7 @@ export class SessionManager {
 
     this.active = undefined;
     this.state = 'idle';
-    // 보통은 disconnectSubscribers로 이미 닫혀 있다.
+    // 위에서 진행 중인 세션을 비운 뒤라, 스트림에 다시 붙으려는 쪽은 404나 409를 받는다.
     this.closeSubscribers(active);
     if (!active.adapterStopped) await active.adapter.stop();
     // 밀린 세그먼트를 마지막으로 써 본다. 서버가 꺼지는 중이라 실패하면 더 기다리지 않는다.
@@ -196,12 +196,6 @@ export class SessionManager {
         console.log(`[stream] #${id} 연결 끊김 (지금 ${active.subscribers.size}개)`);
       }
     };
-  }
-
-  // 서버를 끌 때 HTTP 서버를 닫으면서 부른다. 스트림은 스스로 끝나지 않아 닫아야 서버가 닫힌다.
-  // 세션은 그대로 두고, shutdown에서 닫는다.
-  disconnectSubscribers(): void {
-    if (this.active) this.closeSubscribers(this.active);
   }
 
   // 진행 중인 세션이 아닐 때의 에러. 없는 번호인지, 이미 끝난 세션인지 구분해 알린다.
