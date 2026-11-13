@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-11-12
+마지막 갱신: 2026-11-13
 
 ## 오늘의 작업 (2026-11-02) — 실제 모델 연동과 Rubik Pi 올리기 준비
 
@@ -43,13 +43,13 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### T21 Rubik Pi에 서버 올리기 준비
 
-- 기기 초기 설정(OS 확인, 네트워크, SSH, 시간대)은 T30에서 먼저 함(지침서 `docs/guides/T30.md`, 2026-11-10 사용자 결정)
+- 기기 초기 설정(OS 확인, 네트워크, SSH, 시간대)은 T30에서 먼저 함(지침서 `docs/guides/T30.md`, 2026-11-10 사용자 결정) — 2026-11-13 완료: Ubuntu 24.04.2, `ssh rubikpi` 키 로그인, `rubikpi.local`, 휴대폰 핫스팟(Mac은 IPv6로만 접속). 결과 `docs/guides/T30.md`
 - OS: Ubuntu 24.04(2026-11-10 사용자 결정). 기기에서 `cat /etc/os-release`로 확인(다시 설치하면 데이터가 지워짐)
 - 네트워크: 서버에 로그인이 없으므로 믿을 수 있는 네트워크에서만 실험
 - 설치: `nvm`으로 Node 22.22.0, Docker 없이 `apt`로 PostgreSQL(Ubuntu 24.04 기본 판은 16으로 개발 환경과 같음) (2026-11-10 사용자 확인)
 - 실행: 기기용 `.env`(비밀번호는 예시 값과 다르게), `npm ci`, `npm run db:migrate`, `npm run dev:server`
 - 웹앱 제공: 서버(Express)가 `apps/web/dist`를 같은 포트에서 내보냄(2026-11-12 사용자 결정, T31 완료). 보드에서 `npm run build:web` 뒤 서버를 켜면 `http://rubikpi.local:3000`에서 열림
-- 착수 전 결정: T30에서 보드에 팀 서비스(`audiostack`, `whisper-engine`)가 켜져 있었다면 끌지, 데몬 경로를 `/api/device/sessions`로 바꿀지(기본 `/api/sessions`면 서버를 띄울 때 mock 녹음이 켜짐, `docs/team-questions.md` HW-1)
+- 착수 전 결정: T30에서 보드에 팀 서비스(`audiostack`, `whisper-engine`)가 없었음(2026-11-13). 끌 것은 없고, 데몬 경로(HW-1)는 T26 전에 정함
 - 완료 확인: 노트북 브라우저에서 mock 녹음, 자막, 히스토리까지 동작
 - 측정: 서버와 PostgreSQL의 메모리·CPU, `free -h`, `df -h`
 - 앞선 작업에서 넘어온 확인: listen 주소(T04, 코드상 모든 인터페이스에서 열림. 기기에서 접속만 확인), 세그먼트 대기열 상한(T08), final 목록 메모리(T09), 시간대 데이터(T11), 기기 시계와 쿼리 시간 제한(T13), Node 22 설치(T25)
@@ -59,6 +59,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지 — 2026-11-10 `stt-engine` 저장소로 답 찾음: 모델은 Release `v0.1`, 실행은 `build.sh`·`set_governor.sh performance`·`run_engine.sh`, 보드 NPU에서 실제 `audiostackd`를 거쳐 확인함. 남은 것: QNN 런타임(`sdk250/`)을 받는 방법(`docs/team-questions.md` AI-1)
 - 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로 — 2026-11-10 저장소로 답 찾음: 엔진은 기본 `ubuntu` 계정·`audio` 그룹으로 돎, WAV는 `feed_wav.py` 또는 `snd-aloop`(실제 데몬을 거침). 남은 것: `audiostack.conf` 경로 변경 동의(HW-1), audio-stack PR #1·#2 병합(HW-6)
 - 측정: final 지연, CER, 세 프로그램을 함께 돌릴 때의 메모리·CPU (D8 판단 근거)
+- `apt full-upgrade` 미룸(T30, 2026-11-13): 1,147 MB, 커널 `-1051`→`-1089`, Qualcomm 펌웨어 묶음 변경. 박지윤 확인(AI-2) 뒤 데이터 요금이 없는 네트워크에서
 
 ## 함께 확인할 것
 
@@ -121,9 +122,9 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### 기기 연동
 
-- [ ] T30 Rubik Pi 초기 설정(OS 확인, 네트워크, SSH, 시간) — P0 · 단계 10 · 선행: 없음 · 협의: **[AI]**(다시 설치·업그레이드 전 `~/rubikpi` 확인) · 상태: 지침서 작성(2026-11-10)
+- [x] T30 Rubik Pi 초기 설정(OS 확인, 네트워크, SSH, 시간) — P0 · 단계 10 · 선행: 없음 · 협의: **[AI]**(다시 설치·업그레이드 전 `~/rubikpi` 확인) · 상태: 완료(2026-11-13). `full-upgrade` 미룸
 - [x] T31 Express가 웹앱 빌드 내보내기 — P0 · 단계 10 · 선행: T12 · 협의: 없음 · 상태: 완료(2026-11-12)
-- [ ] T21 Rubik Pi에 서버 올리기와 실측(mock STT, Node, PostgreSQL, 메모리·CPU) — P0 · 단계 10 · 선행: T18, T30, T31 · 협의: **[하드웨어]** (D5) · 순서: T20 뒤 · 상태: 착수 가능(2026-11-10, 기기는 사용자가 보관). 착수 전 결정: 팀 서비스 처리(HW-1)
+- [ ] T21 Rubik Pi에 서버 올리기와 실측(mock STT, Node, PostgreSQL, 메모리·CPU) — P0 · 단계 10 · 선행: T18, T30, T31 · 협의: **[하드웨어]** (D5) · 순서: T20 뒤 · 상태: 착수 가능(2026-11-13, T30 완료, 팀 서비스 없음)
 - [ ] T26 Rubik Pi에서 실제 모델과 서버 연동(WAV 입력) — P0 · 단계 11 · 선행: T20, T21 · 협의: **[AI, 하드웨어]**
 - [ ] T27 하드웨어 파이프라인 연동(`audiostackd`, 마이크, 물리 버튼) — P0 · 단계 12 · 선행: T26 · 협의: **[하드웨어]** · 상태: 보류(내용 파악 뒤 시작)
 
@@ -148,6 +149,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-13 | T30 | 완료 | 브랜치 `docs/t30-result`. 기본 계정 로그인 실패(아이디 앞 공백)로 사용자 결정에 따라 GRUB `init=/bin/bash`에서 비밀번호를 다시 정함(다시 설치 안 함, 공장 출하 상태, `~/rubikpi`·팀 서비스 없음). 휴대폰 핫스팟, `rubikpi`, `Asia/Seoul`, avahi, SSH 키, 재부팅·포트·기준값 확인. 지침서와 다른 점: BSSID로 연결, Mac이 IPv6로만 닿아 `ping6`·`--bind ::` 사용 | `full-upgrade` 미룸(1,147 MB, 커널·Qualcomm 펌웨어 변경, AI-2 확인 뒤), 커밋 안 함 | T21 |
 | 2026-11-12 | T31 | 완료 | 기기 테스트 전 남은 개발 정리(꼭 할 것은 웹앱 제공 하나) 뒤 사용자 결정으로 T31 진행. `f02f59e`를 `main`에 fast-forward 병합, `main`에서 `feat/t31-serve-web`. 지침서 `T31.md`(구현 전), `http/web.ts`(빌드가 있으면 `apps/web/dist` 제공, 화면 주소는 `index.html`, `assets/` 긴 캐시), `app.ts`·`index.ts`, 루트 `build:web`. 완료 기준 통과(typecheck, 테스트 42개, curl, LAN 주소 `200`, 브라우저 #66 녹음·자막·새로고침·txt·md, psql 15행, 빌드 없을 때 API만, 5173 그대로). 지침서와 다른 점 없음 | 커밋(`7b98571`, `7a9ba41`)하고 `main`에 병합(fast-forward), push 안 함. 다른 기기 브라우저 확인은 T21 | T30 착수 |
 | 2026-11-10 | 팀 저장소 확인 | 완료 | 브랜치 `docs/team-repo-findings`(`docs/t30-device-setup`에서)에서 조직 저장소를 읽기만 해 확인. `stt-engine` `c8f5bd3`·`audio-stack` `7ee28fa` 그대로, audio-stack PR #1·#2 리뷰 없음, 김범수 답 없음. 물을 것 중 12개는 저장소에서 답을 찾음(`ctrl.sock`은 `root:audio 0660`이라 서버 계정을 `audio` 그룹에 넣으면 됨, `503`·`4xx`는 3초마다 계속 다시 보냄, 대기열이 차면 세션 통지·`/end`도 버려질 수 있음, 엔진이 끊겨도 데몬은 세션 유지, NPU는 `ubuntu` 계정, WAV 경로 두 가지 등). 새 파일 `docs/team-questions.md`, `T19.md`·`T30.md`·`d4-stt-questions.md`·`project-overview.md` 갱신. 데몬·엔진 실행과 코드 변경 없음 | 남은 질문 김범수 8개, 박지윤 7개(새 질문: QNN 런타임 받는 방법, 같은 보드에서 CPU 나누기), 둘 다 1개. 보낼지는 사용자가 정함. 조직 Projects는 토큰 권한(`read:project`)이 없어 못 봄. 커밋하고 `main`에 병합(`bdc34aa`, T30 커밋 포함), push 안 함 | 질문 보내기, T30 착수 |
 | 2026-11-10 | T30 | 진행 중 | 브랜치 `docs/t30-device-setup`에서 지침서 `T30.md` 작성(9단계, 단계별 확인 명령, 2단계 판단 표). Thundercomm 매뉴얼 1.0.0-u 확인. 사용자 결정: 초기 설정을 T21과 나눠 T30으로 | 기기 작업 전. 네트워크, 다시 설치 여부, 업그레이드 범위는 착수 때 정함 | T30 착수(보드 연결) |
