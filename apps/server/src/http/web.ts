@@ -4,8 +4,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type RequestHandler, type Router } from 'express';
 
-// 저장소 안의 고정 경로라 환경변수로 받지 않는다. 이 파일은 apps/server/src/http에 있다.
-export const WEB_DIST_DIR = fileURLToPath(new URL('../../../web/dist', import.meta.url));
+// 이 코드가 있는 폴더에서 위로 올라가며 package.json이 있는 첫 폴더(= apps/server)를 찾는다.
+// 개발 방식(src/http/web.ts)과 묶은 파일(dist/index.js)은 깊이가 달라 고정 상대 경로를 쓸 수 없다. (T33)
+function findServerPackageDir(): string {
+  let dir = path.dirname(fileURLToPath(import.meta.url));
+  while (!existsSync(path.join(dir, 'package.json'))) {
+    const parent = path.dirname(dir);
+    if (parent === dir) throw new Error('서버 패키지 폴더(package.json)를 찾지 못했습니다');
+    dir = parent;
+  }
+  return dir;
+}
+
+// 저장소 안의 고정 경로라 환경변수로 받지 않는다. 서버 패키지 폴더 옆의 apps/web/dist다.
+export const WEB_DIST_DIR = path.join(findServerPackageDir(), '..', 'web', 'dist');
 
 // 1년. assets/ 파일 이름에는 내용 해시가 붙어, 새 빌드는 새 이름이 된다.
 const ASSET_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000;

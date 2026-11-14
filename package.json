@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc --noEmit -p apps/web/tsconfig.node.json && tsc --noEmit -p packages/shared",
     "test": "vitest run",
     "dev:server": "npm run dev -w @app/server",
+    "build:server": "npm run build -w @app/server",
+    "start:server": "npm run start -w @app/server",
     "dev:web": "npm run dev -w @app/web",
     "build:web": "npm run build -w @app/web",
     "dev:stt": "npm run dev:stt -w @app/server",
