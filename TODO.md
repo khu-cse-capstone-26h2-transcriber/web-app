@@ -59,7 +59,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 ### T26 Rubik Pi에서 모델과 서버 연동 준비
 
 - 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지 — 2026-11-10 `stt-engine` 저장소로 답 찾음: 모델은 Release `v0.1`, 실행은 `build.sh`·`set_governor.sh performance`·`run_engine.sh`, 보드 NPU에서 실제 `audiostackd`를 거쳐 확인함. 남은 것: QNN 런타임(`sdk250/`)을 받는 방법(`docs/team-questions.md` AI-1)
-- 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로 — 2026-11-10 저장소로 답 찾음: 엔진은 기본 `ubuntu` 계정·`audio` 그룹으로 돎, WAV는 `feed_wav.py` 또는 `snd-aloop`(실제 데몬을 거침). 남은 것: `audiostack.conf` 경로 변경 동의(HW-1), audio-stack PR #1·#2 병합(HW-6)
+- 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로 — 2026-11-10 저장소로 답 찾음: 엔진은 기본 `ubuntu` 계정·`audio` 그룹으로 돎, WAV는 `feed_wav.py` 또는 `snd-aloop`(실제 데몬을 거침). 남은 것: `audiostack.conf` 경로 변경 동의(HW-1, `snd-aloop`용 `loopback.conf`에도 `[backend]` 필요, 2026-11-14), audio-stack PR #1·#2 병합(HW-6)
 - 측정: final 지연, CER, 세 프로그램을 함께 돌릴 때의 메모리·CPU (D8 판단 근거)
 - `apt full-upgrade` 미룸(T30, 2026-11-13): 1,147 MB, 커널 `-1051`→`-1089`, Qualcomm 펌웨어 묶음 변경. 박지윤 확인(AI-2) 뒤 데이터 요금이 없는 네트워크에서
 - T21에서 넘어온 것: 브라우저가 열린 녹음 중 SIGTERM으로 서버가 꺼지지 않음(T32에서 고침, 2026-11-14 완료. 보드 확인은 T26), `npm run` 묶음 약 100 MB(`node`로 바로 띄울지). 원인은 `docs/guides/T21.md` '원인 분석'(SIGTERM은 종료 순서와 keep-alive 재연결)
@@ -75,7 +75,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 - [ ] 박지윤에게 PR #1 병합 방식 알리기 (T20 push 전)
-- [ ] 팀원에게 남은 질문 보내기 — `docs/team-questions.md` 2장(김범수 HW-1~8, 박지윤 AI-1~7, 둘 다 ALL-1). 보낼지와 보내는 방법은 사용자가 정함
+- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류
 
 ### 결정하면 풀리는 작업
 
@@ -155,6 +155,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-14 | 팀 질문 보내기 | 완료 | 사람별로 묶어 이슈로 올림: `audio-stack` #3(HW-1~8·10), `stt-engine` #1(AI-1~7). 읽기 권한이라 PR 대신 이슈. HW-9·HW-11은 사용자 결정으로 뺌. `team-questions.md` 상태 칸(보냄·보류), `audio-stack`을 공개 저장소로 고침 | ALL-1·2 안 보냄, 커밋 안 함 | 답 기다리며 T26 전 점검 우선순위 |
+| 2026-11-14 | 팀 질문 정리 | 완료 | 브랜치 `docs/team-questions-1114`. T26 전 점검(정하거나 고칠 것 16개 보고, typecheck·테스트 42개 통과, 팀 저장소 변경 없음) 뒤 사용자 요청으로 `team-questions.md`를 11-14판으로 다시 씀. 질문마다 보낼 문장·배경·제안·답이 늦으면, 사람별로 묶은 글(4장). 고침: AI-1(헤더도), AI-2(커널·펌웨어 판), HW-1(`loopback.conf`에 `[backend]` 없음). 새로: HW-9~11, ALL-2. 코드 변경 없음 | 보낼지는 사용자가 정함(HW-11은 보드 확인 뒤, HW-9는 넣을지 결정). 점검 목록 우선순위 대기. 커밋 안 함 | 점검 목록 우선순위대로 진행 |
 | 2026-11-14 | T32 | 완료 | 브랜치 `fix/t32-sigterm-shutdown`, 노트북에서 재현(#67 멈춤) 뒤 고침: 세션 중단과 `server.close()`를 함께 시작, 5초 뒤 `closeAllConnections()`, 세션을 한 번 더 닫음, `disconnectSubscribers` 삭제. 녹음 화면이 열린 채 SIGTERM·SIGINT로 같은 초에 종료, 안전장치는 따로 5.04초 확인. 지침서와 다른 점: 안전장치 없이 바로 끝나 브라우저는 상세 화면 대신 끊김 배너 | 보드·systemd 확인은 T26. 커밋(`61c83a0` 코드, `0d094d7` 문서)하고 `main`에 병합(fast-forward), push 안 함 | T26 준비 |
 | 2026-11-14 | T21 원인 분석 | 완료 | 브랜치 `docs/t21-issue-analysis`, 찾은 문제 5개와 작은 것들의 원인 정리. SIGTERM 멈춤은 Node 22에서 재현(`close()` 뒤 keep-alive 소켓으로 재연결), 핫스팟 5초는 avahi `publish-a-on-ipv6=no`, `.local` 외부 주소는 일반 DNS 답이 mDNS보다 먼저 옴, 보드 부팅 기록 정정(11-13 15:53 정상 `poweroff` 뒤 시각 불명의 부팅이 끄는 기록 없이 끝남). 코드 변경 없음 | 보드 무응답 원인 미정(계속 꽂아 두었는지 확인 필요), 네트워크 없이 부팅하면 시계가 틀림. 커밋(`7b6bb05`)하고 `main`에 병합(fast-forward), push 안 함 | 찾은 문제 처리 결정(SIGTERM은 T26·T27 전), T26 준비 |
 | 2026-11-14 | T21 1시간 녹음 | 완료 | 브랜치 `docs/t21-hour-recording`, 집 와이파이에 보드를 콘솔로 연결, 녹음 #5 60분(PSS +6.7 MB, CPU 0.62%, 3,850 모두 일치, 응답 135~185 ms), 이름 해석 4~7 ms. 지침서와 다른 점: 보드가 직접 종료, 기록 파일 이름, IP로 접속 | 공유기 DNS가 `.local`에 외부 주소를 답함(절전은 원인 아님). 처음에 보드가 부팅 안 돼 있었음. 커밋(`df86fd6`)하고 `main`에 병합(fast-forward), push 안 함 | 접속 방법 결정, 찾은 문제 처리 결정, T26 준비(AI-1, HW-1) |
