@@ -159,7 +159,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
-| 2026-11-15 | T26 지침서 | 완료 | 브랜치 `docs/t26-guide`, `docs/guides/T26.md`. AI-1 답이 없는 것을 확인한 뒤 사용자 결정 3개: AI-1 답 뒤 보드 작업을 한 번에, 앱 서버는 systemd(자동 시작 안 함), 시험 음성은 fleurs·demo_long·zeroth 약 19분. QNN 2.50 공개 배포는 찾지 못함(2.47까지). 스크립트 문법 확인 | AI-1 답 대기. 커밋(`287cb1f`)하고 `main`에 병합(fast-forward), push 안 함 | AI-1 답이 오면 T26 |
+| 2026-11-15 | T26 지침서 | 완료 | 브랜치 `docs/t26-guide`, `docs/guides/T26.md`. AI-1 답이 없는 것을 확인한 뒤 사용자 결정 3개: AI-1 답 뒤 보드 작업을 한 번에, 앱 서버는 systemd(자동 시작 안 함), 시험 음성은 fleurs·demo_long·zeroth 약 19분. QNN 2.50 공개 배포는 찾지 못함(2.47까지). 스크립트 문법 확인 | AI-1 답 대기. 커밋(`287cb1f`)하고 `main`에 병합(fast-forward)하고 push(2026-11-15, `83cf101`) | AI-1 답이 오면 T26 |
 | 2026-11-15 | T31 push | 완료 | 사용자 결정으로 `main` 전체 push(T30·T21·T32·T33·팀 질문 포함 28개 커밋, `9fef6da..88266c0`). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, diff에 IP·비밀번호 값 없음 | 없음 | T26 지침서 |
 | 2026-11-14 | T33 | 완료 | 브랜치 `feat/t33-server-build`, T26 전 점검 B 결정(8개 모두 추천 방식) 뒤 새 작업. `esbuild` 0.28.2 고정, `build`·`start`·`build:server`·`start:server`, `WEB_DIST_DIR`을 서버 패키지 폴더 기준으로. 노트북에서 `node` 하나로 웹앱·API·mock 녹음 #71·SIGTERM 151 ms 확인, 메모리(macOS RSS) 묶은 서버 약 69 MB vs 개발 방식 묶음 약 298 MB. 지침서와 다른 점: 잠금 파일에 `peer` 표시 추가(설치 판은 그대로) | 보드 확인은 T26. 커밋 두 개(`3b5cbcb` 코드, `299fb63` 문서)하고 `main`에 병합(fast-forward), push 안 함 | T26 지침서 |
 | 2026-11-14 | 팀 질문 보내기 | 완료 | 사람별로 묶어 이슈로 올림: `audio-stack` #3(HW-1~8·10), `stt-engine` #1(AI-1~7). 읽기 권한이라 PR 대신 이슈. HW-9·HW-11은 사용자 결정으로 뺌. `team-questions.md` 상태 칸(보냄·보류), `audio-stack`을 공개 저장소로 고침 | ALL-1·2 안 보냄. 커밋(`4968c0d`)하고 `main`에 병합(fast-forward), push 안 함 | 답 기다리며 T26 전 점검 우선순위 |
