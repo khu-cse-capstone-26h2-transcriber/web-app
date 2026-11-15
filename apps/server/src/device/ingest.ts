@@ -105,6 +105,16 @@ export class DeviceIngest {
     return accepted({ sessionId }, 200);
   }
 
+  // 기기 세션 번호로 서버 세션 번호를 찾는다. 아직 시작 통지가 오지 않았으면 undefined.
+  sessionIdOf(deviceId: string): number | undefined {
+    return this.current?.deviceId === deviceId ? this.current.sessionId : undefined;
+  }
+
+  // 이 서버 세션이 지금 녹음 중인 기기 세션인지
+  isCurrent(sessionId: number): boolean {
+    return this.current?.sessionId === sessionId;
+  }
+
   private keepForLateResults(session: DeviceSession): void {
     const timer = setTimeout(() => this.closing.delete(session.deviceId), LATE_RESULT_MS);
     timer.unref();

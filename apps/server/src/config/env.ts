@@ -21,6 +21,8 @@ export interface Env {
   sttMode: SttMode;
   // sttMode가 local일 때만 있다.
   localStt: LocalSttEnv | null;
+  // 있으면 웹의 녹음 시작·종료가 기기(audiostackd) ctrl.sock으로 간다 (HW-2).
+  deviceCtrlSocket: string | null;
 }
 
 function fail(message: string): never {
@@ -58,7 +60,14 @@ export function loadEnv(): Env {
     localStt = { python: env.LOCAL_STT_PYTHON, script: env.LOCAL_STT_SCRIPT, wav: env.LOCAL_STT_WAV };
   }
 
-  return { port, dbUrl: DB_URL, sttUrl: STT_URL, sttMode, localStt };
+  return {
+    port,
+    dbUrl: DB_URL,
+    sttUrl: STT_URL,
+    sttMode,
+    localStt,
+    deviceCtrlSocket: process.env.DEVICE_CTRL_SOCKET || null,
+  };
 }
 
 // 로그에 찍을 DB 주소. 비밀번호 자리를 가린다.
