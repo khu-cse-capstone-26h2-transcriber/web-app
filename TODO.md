@@ -78,8 +78,9 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 - [ ] 박지윤에게 PR #1 병합 방식 알리기 (T20 push 전)
-- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. AI-1~7은 2026-11-15 모두 답 받음(`docs/team-questions.md` 2장 AI 절). 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류
-- [ ] 박지윤에게 T26 결과 알리기(FastRPC 설치 방법, 긴 문장 반복, 잡음 옵션 빈 final)
+- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. AI-1~7은 2026-11-15 모두 답 받음(`docs/team-questions.md` 2장 AI 절). 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류. 2026-11-16 AI-8~10은 `stt-engine` #2로 보냄, HW-12는 노션
+- [x] 박지윤에게 T26 결과 알리기(FastRPC 설치 방법, 긴 문장 반복, 잡음 옵션 빈 final) — 2026-11-16 `stt-engine` #2로 보냄(AI-8~10)
+- [ ] 김범수에게 T26 결과 노션에 올리기(HW-12)
 - [ ] 집 공유기에서 보드 IP 고정(DHCP 예약) — 보드 와이파이 MAC 주소 필요(보드에서 `ip link`) (T26은 학교·핫스팟에서 해서 급하지 않음)
 
 ### 결정하면 풀리는 작업
@@ -161,6 +162,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-16 | T26 결과 공유 | 완료 | 브랜치 `docs/t26-team-questions`. 박지윤에게 `stt-engine` #2(AI-8~10), 김범수 몫(HW-12)은 노션 글로 씀(사용자가 올림). `team-questions.md`에 AI-8~10·HW-12 더함 | 노션 올리기(사용자). 커밋 안 함 | 답 기다리기, T27 |
 | 2026-11-16 | T26 | 완료 | 브랜치 `docs/t26-board-engine`. 학교에서 핫스팟으로 진행(사용자 결정, 지침서 1-1단계 추가). 업그레이드(`-1089`, 학교 와이파이에서 보드 혼자 받기), `qcom-fastrpc1` 설치(사용자 결정)로 엔진이 NPU에서 돎. 연동 fleurs·demo_long·19분 모두 행 수 일치, CER 7.56%·12.22%·8.60%, 지연 평균 1.04~1.16초, 세 프로그램 PSS 약 169 MB + NPU 약 690 MB, CPU 엔진 5%·서버 0.3%. systemd 끄기 0.07초(T32), `node dist`(T33) 보드 확인. 지침서와 다른 점은 지침서 '결과' | 박지윤에게 알릴 것 3개. 학교망 기기 간 SSH는 못 봄. SSH 비밀번호 로그인 꺼 둠(T30 결정 바꿈). 커밋 `d9e3b7e`, `main` 병합(fast-forward), push 안 함 | T27(HW 답 필요), D8 판단 |
 | 2026-11-16 | T26 지침서 AI 답 반영 | 완료 | 브랜치 `docs/ai-issue-answers`, `docs/guides/T26.md`. 사용자 결정 2개: T26 전 `full-upgrade`(2단계에 업그레이드·재부팅·펌웨어 차이 확인 추가), 잡음 옵션은 새 기본값(켬)으로 재고 `NOISE=0` demo_long은 선택 단계. 엔진 옵션 `NOISE=1`, fleurs 정답 하나, `PARTIAL=0` 단계 뺌, QNN 묶음 풀기 명령, 예상 시간 3시간. `team-questions.md`도 결정에 맞춤. 새 명령은 Mac에서 문법만 확인 | 보드에서 안 돌려 봄. 커밋(`9da2da8`)하고 `main`에 병합(fast-forward), push 안 함 | T26 착수 |
 | 2026-11-16 | AI 답 정리 | 완료 | 브랜치 `docs/ai-issue-answers`. `stt-engine` #1 답(AI-1~7)을 질문별로 보고한 뒤 사용자 확인으로 `team-questions.md`에 반영(AI 절마다 답·앱에서 할 일, 표 상태, 3장 T26·T27). AI-1 SDK 묶음의 구성과 경로가 `run_stream.sh`·`build.sh`·T26 지침서와 맞음을 Mac에서 확인. 코드 변경 없음 | `full-upgrade` 여부 결정, T26 지침서 반영, 이슈 체크 목록, Mac `stt-engine` 받아 오기. 커밋(`9da2da8`)하고 `main`에 병합(fast-forward), push 안 함 | T26 지침서에 AI 답 반영 |
