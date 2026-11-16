@@ -58,11 +58,11 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 ### T26 Rubik Pi에서 모델과 서버 연동 준비
 
-- 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지 — 2026-11-10 `stt-engine` 저장소로 답 찾음: 모델은 Release `v0.1`, 실행은 `build.sh`·`set_governor.sh performance`·`run_engine.sh`, 보드 NPU에서 실제 `audiostackd`를 거쳐 확인함. 남은 것: QNN 런타임(`sdk250/`)을 받는 방법(`docs/team-questions.md` AI-1)
+- 박지윤: NPU용 모델, QNN 런타임, 엔진 실행 방법, 기기에서 실제 받아쓰기를 확인했는지 — 2026-11-10 `stt-engine` 저장소로 답 찾음: 모델은 Release `v0.1`, 실행은 `build.sh`·`set_governor.sh performance`·`run_engine.sh`, 보드 NPU에서 실제 `audiostackd`를 거쳐 확인함. QNN SDK는 2026-11-16 AI-1 답대로 받음(박지윤 묶음, QAIRT 2.50.0.260828, `docs/team-questions.md` AI-1)
 - 김범수: NPU 접근 권한, 마이크 없이 WAV를 넣는 경로 — 2026-11-10 저장소로 답 찾음: 엔진은 기본 `ubuntu` 계정·`audio` 그룹으로 돎, WAV는 `feed_wav.py` 또는 `snd-aloop`(실제 데몬을 거침). 남은 것: `audiostack.conf` 경로 변경 동의(HW-1, `snd-aloop`용 `loopback.conf`에도 `[backend]` 필요, 2026-11-14), audio-stack PR #1·#2 병합(HW-6)
 - 측정: final 지연, CER, 세 프로그램을 함께 돌릴 때의 메모리·CPU (D8 판단 근거)
-- 지침서: `docs/guides/T26.md` (2026-11-15). 착수는 AI-1 답 뒤(사용자 결정). 서버는 systemd 서비스(자동 시작 안 함), 시험 음성은 fleurs·demo_long·zeroth 100개 이은 약 19분
-- `apt full-upgrade` 미룸(T30, 2026-11-13): 1,147 MB, 커널 `-1051`→`-1089`, Qualcomm 펌웨어 묶음 변경. 박지윤 확인(AI-2) 뒤 데이터 요금이 없는 네트워크에서
+- 지침서: `docs/guides/T26.md` (2026-11-15). 착수는 AI-1 답 뒤(사용자 결정). 서버는 systemd 서비스(자동 시작 안 함), 시험 음성은 fleurs·demo_long·zeroth 100개 이은 약 19분. 2026-11-16 AI 답 반영: 시작 전 `full-upgrade`(2단계), 잡음 옵션은 기본(켬)으로 재고 `NOISE=0` 비교는 선택 단계
+- `apt full-upgrade` 미룸(T30, 2026-11-13): 1,147 MB, 커널 `-1051`→`-1089`, Qualcomm 펌웨어 묶음 변경. AI-2 답(2026-11-15): 측정 보드는 `-1084`, 해도 됨. 2026-11-16 사용자 결정: T26 2단계에서 함(데이터 요금이 없는 네트워크)
 - T21에서 넘어온 것: 브라우저가 열린 녹음 중 SIGTERM으로 서버가 꺼지지 않음(T32에서 고침, 2026-11-14 완료. 보드 확인은 T26), `npm run` 묶음 약 100 MB(T33에서 고침, 2026-11-14 완료. 보드 확인은 T26). 원인은 `docs/guides/T21.md` '원인 분석'(SIGTERM은 종료 순서와 keep-alive 재연결)
 - 보드에 RTC가 없어 네트워크 없이 부팅하면 시계가 틀림(T26은 시험 전 `timedatectl` 확인만, 대책은 HW-10 답 뒤 T27). 보드 무응답 원인 미정(꽂아 둔 채 멈췄는지 사용자 확인)
 - 집 와이파이 DNS가 `.local`에 외부 주소를 답함(2026-11-14, T21 1시간 녹음). 공유기에서 보드 IP 고정으로 정함(2026-11-14, 사용자가 설정. 안 되면 매번 IP 확인)
@@ -77,7 +77,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 - [ ] 박지윤에게 PR #1 병합 방식 알리기 (T20 push 전)
-- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류
+- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. AI-1~7은 2026-11-15 모두 답 받음(`docs/team-questions.md` 2장 AI 절). 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류
 - [ ] 집 공유기에서 보드 IP 고정(DHCP 예약) — 보드 와이파이 MAC 주소 필요(보드에서 `ip link`)
 
 ### 결정하면 풀리는 작업
@@ -135,7 +135,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - [x] T21 Rubik Pi에 서버 올리기와 실측(mock STT, Node, PostgreSQL, 메모리·CPU) — P0 · 단계 10 · 선행: T18, T30, T31 · 협의: **[하드웨어]** (D5) · 순서: T20 뒤 · 상태: 완료(2026-11-13). 찾은 문제 3개 기록, 1시간 녹음 2026-11-14 완료, 원인 분석 2026-11-14
 - [x] T32 SIGTERM 멈춤 고치기(세션 먼저 중단, 5초 뒤 남은 연결 끊기) — P1 · 단계 11 · 선행: T21 · 협의: 없음 · 상태: 완료(2026-11-14). 노트북에서 재현 뒤 고침, 녹음 화면이 열린 채 SIGTERM·SIGINT로 같은 초에 종료. 보드 확인은 T26
 - [x] T33 서버 빌드와 운용 실행 방식(esbuild로 묶어 `node`로 실행) — P1 · 단계 11 · 선행: T21 · 협의: 없음 · 상태: 완료(2026-11-14). 노트북에서 `node` 하나로 웹앱·API·mock 녹음·SIGTERM 확인. 보드 확인은 T26
-- [ ] T26 Rubik Pi에서 실제 모델과 서버 연동(WAV 입력) — P0 · 단계 11 · 선행: T20, T21 · 협의: **[AI, 하드웨어]** · 상태: 지침서 작성(2026-11-15), AI-1 답 대기
+- [ ] T26 Rubik Pi에서 실제 모델과 서버 연동(WAV 입력) — P0 · 단계 11 · 선행: T20, T21 · 협의: **[AI, 하드웨어]** · 상태: 지침서 작성(2026-11-15), AI-1~7 답 받음(2026-11-15), 지침서에 답 반영(2026-11-16), 착수 가능
 - [ ] T27 하드웨어 파이프라인 연동(`audiostackd`, 마이크, 물리 버튼) — P0 · 단계 12 · 선행: T26 · 협의: **[하드웨어]** · 상태: 보류(내용 파악 뒤 시작)
 
 ### 확장
@@ -159,6 +159,8 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-16 | T26 지침서 AI 답 반영 | 완료 | 브랜치 `docs/ai-issue-answers`, `docs/guides/T26.md`. 사용자 결정 2개: T26 전 `full-upgrade`(2단계에 업그레이드·재부팅·펌웨어 차이 확인 추가), 잡음 옵션은 새 기본값(켬)으로 재고 `NOISE=0` demo_long은 선택 단계. 엔진 옵션 `NOISE=1`, fleurs 정답 하나, `PARTIAL=0` 단계 뺌, QNN 묶음 풀기 명령, 예상 시간 3시간. `team-questions.md`도 결정에 맞춤. 새 명령은 Mac에서 문법만 확인 | 보드에서 안 돌려 봄. 커밋 안 함 | T26 착수 |
+| 2026-11-16 | AI 답 정리 | 완료 | 브랜치 `docs/ai-issue-answers`. `stt-engine` #1 답(AI-1~7)을 질문별로 보고한 뒤 사용자 확인으로 `team-questions.md`에 반영(AI 절마다 답·앱에서 할 일, 표 상태, 3장 T26·T27). AI-1 SDK 묶음의 구성과 경로가 `run_stream.sh`·`build.sh`·T26 지침서와 맞음을 Mac에서 확인. 코드 변경 없음 | `full-upgrade` 여부 결정, T26 지침서 반영, 이슈 체크 목록, Mac `stt-engine` 받아 오기. 커밋 안 함 | T26 지침서에 AI 답 반영 |
 | 2026-11-15 | T26 지침서 | 완료 | 브랜치 `docs/t26-guide`, `docs/guides/T26.md`. AI-1 답이 없는 것을 확인한 뒤 사용자 결정 3개: AI-1 답 뒤 보드 작업을 한 번에, 앱 서버는 systemd(자동 시작 안 함), 시험 음성은 fleurs·demo_long·zeroth 약 19분. QNN 2.50 공개 배포는 찾지 못함(2.47까지). 스크립트 문법 확인 | AI-1 답 대기. 커밋(`287cb1f`)하고 `main`에 병합(fast-forward)하고 push(2026-11-15, `83cf101`) | AI-1 답이 오면 T26 |
 | 2026-11-15 | T31 push | 완료 | 사용자 결정으로 `main` 전체 push(T30·T21·T32·T33·팀 질문 포함 28개 커밋, `9fef6da..88266c0`). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, diff에 IP·비밀번호 값 없음 | 없음 | T26 지침서 |
 | 2026-11-14 | T33 | 완료 | 브랜치 `feat/t33-server-build`, T26 전 점검 B 결정(8개 모두 추천 방식) 뒤 새 작업. `esbuild` 0.28.2 고정, `build`·`start`·`build:server`·`start:server`, `WEB_DIST_DIR`을 서버 패키지 폴더 기준으로. 노트북에서 `node` 하나로 웹앱·API·mock 녹음 #71·SIGTERM 151 ms 확인, 메모리(macOS RSS) 묶은 서버 약 69 MB vs 개발 방식 묶음 약 298 MB. 지침서와 다른 점: 잠금 파일에 `peer` 표시 추가(설치 판은 그대로) | 보드 확인은 T26. 커밋 두 개(`3b5cbcb` 코드, `299fb63` 문서)하고 `main`에 병합(fast-forward), push 안 함 | T26 지침서 |
