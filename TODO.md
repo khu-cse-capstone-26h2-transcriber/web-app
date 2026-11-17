@@ -163,6 +163,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-17 | main push | 완료 | 사용자 요청으로 `main` push(11개 커밋, `83cf101..858aa0f`: AI 답 정리, T26, T26 결과 공유, 김범수 노션 답, T34 지침서와 각 병합 기록). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 7개이고 IP·비밀번호 값 없음 | 없음 | T34 보드 시험, 목요일 마이크 연결 |
 | 2026-11-17 | T34 | 진행 중 | 브랜치 `docs/t34-guide`, 지침서 `docs/guides/T34.md`. 사용자 결정 4개(범위 웹 자막까지, PipeWire, 새 작업 T34, 목요일 HW 마이크). 블루투스 방식 조사(매뉴얼은 PipeWire, Ubuntu 24.04 PipeWire 1.0.5·WirePlumber 0.4.17, BlueALSA는 mSBC 없음), Codeberg `3a03c28` 데몬 장치 열기 확인, Mac에서 `sed`·`level.py` 확인. 코드 변경 없음 | 보드 시험 전. 커밋 `d146c91`, `main` 병합(fast-forward), push 안 함 | T34 보드 시험, 목요일 마이크 연결 |
 | 2026-11-16 | 김범수 노션 답 정리 | 완료 | 브랜치 `docs/hw-notion-answers`. Codeberg `audio-stack`(`3a03c28`)의 오디오 입력 확인(3.5 mm 기본, XVF3800 설정 3개, 실물 확인 기록 없음)과 노션 댓글 8개를 `team-questions.md` HW 절에 답·확인한 것·앱에서 할 일로 반영. 코드 변경 없음 | HW-5·HW-8 답 없음, HW-12 잠정. 버튼 프로그램 담당·XVF3800 도착·기준 저장소(Codeberg/GitHub) 확인 남음. 커밋 `b71eae1`, `main` 병합(fast-forward), push 안 함 | T27 지침서(HW 답 반영) |
 | 2026-11-16 | T26 결과 공유 | 완료 | 브랜치 `docs/t26-team-questions`. 박지윤에게 `stt-engine` #2(AI-8~10), 김범수 몫(HW-12)은 노션 글로 씀(사용자가 올림). `team-questions.md`에 AI-8~10·HW-12 더함 | 노션 올리기(사용자). 커밋 `2668914`, `main` 병합(fast-forward), push 안 함 | 답 기다리기, T27 |
