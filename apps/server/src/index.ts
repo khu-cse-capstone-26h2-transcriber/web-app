@@ -20,7 +20,7 @@ const createAdapter: () => SttAdapter = localStt
 const sessions = new SessionManager(pool, createAdapter);
 // 웹앱 빌드는 켤 때 한 번만 찾는다. 새로 빌드했으면 서버를 다시 켠다. (T31)
 const web = createWebRouter(WEB_DIST_DIR);
-const app = createApp(pool, sessions, web);
+const app = createApp(pool, sessions, web, env.deviceCtrlSocket);
 
 // 서버가 꺼질 때 닫지 못한 세션을 정리한다. DB가 꺼져 있어도 서버는 띄운다.
 try {
@@ -46,6 +46,7 @@ const server = app.listen(env.port, (error?: Error) => {
   console.log(
     `[server] config - PORT=${env.port} DB_URL=${maskDbUrl(env.dbUrl)} STT_URL=${env.sttUrl} STT_MODE=${env.sttMode}`,
   );
+  if (env.deviceCtrlSocket) console.log(`[server] device - 녹음 버튼이 기기로 갑니다 (${env.deviceCtrlSocket})`);
   if (localStt) console.log(`[server] local STT - ${localStt.script} (WAV ${localStt.wav})`);
   if (web) {
     console.log(`[server] web - 웹앱 빌드를 내보냅니다 (${WEB_DIST_DIR})`);

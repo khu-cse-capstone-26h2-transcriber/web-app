@@ -12,6 +12,7 @@ import { exportSession } from '../export/format';
 import { HttpError } from '../http/errors';
 import { SseStream } from '../http/sse';
 import { listSegments } from '../segments/repository';
+import type { DeviceControl } from '../device/control';
 import type { SessionManager, SessionSubscriber } from './manager';
 import { findSession, listFinishedSessions } from './repository';
 
@@ -68,7 +69,12 @@ function sseEventId(message: SessionStreamMessage): string | undefined {
 }
 
 // 히스토리(목록, 상세)는 DB만 읽으므로 pool로 직접 읽는다. 시작·종료·스트림은 SessionManager가 맡는다.
-export function createSessionRouter(pool: Pool, sessions: SessionManager): Router {
+// control이 있으면 시작·종료를 기기에 맡긴다 (HW-2).
+export function createSessionRouter(
+  pool: Pool,
+  sessions: SessionManager,
+  control: DeviceControl | null = null,
+): Router {
   const router = express.Router();
 
   // 히스토리 목록. 끝난 세션 중 세그먼트가 있는 것만, 최근에 시작한 것부터.
@@ -78,7 +84,10 @@ export function createSessionRouter(pool: Pool, sessions: SessionManager): Route
 
   // 세션을 시작한다. 진행 중인 세션이 있으면 409.
   router.post('/', async (_req, res) => {
-    res.status(201).json({ session: await sessions.start() });
+    if (sessions.getActive()) {
+      throw new HttpError(409, 'SESSION_ALREADY_ACTIVE', '이미 진행 중인 세션이 있습니다');
+    }
+    res.status(201).json({ session: control ? await control.start() : await sessions.start() });
   });
 
   // 진행 중인 세션. 없으면 session이 null이다. '/:id'보다 앞에 있어야 active가 번호로 읽히지 않는다.
@@ -111,7 +120,7 @@ export function createSessionRouter(pool: Pool, sessions: SessionManager): Route
   // 세션을 종료한다. 없는 번호면 404, 진행 중이 아니면 409.
   router.post('/:id/stop', async (req, res) => {
     const id = parseSessionId(req.params.id);
-    res.json({ session: await sessions.stop(id) });
+    res.json({ session: control ? await control.stop(id) : await sessions.stop(id) });
   });
 
   // 진행 중인 세션의 partial/final을 SSE로 보낸다. 세션이 끝나면 ended를 보내고 닫는다.

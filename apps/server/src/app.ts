@@ -1,6 +1,7 @@
 // Express 앱을 조립한다. listen은 index.ts에서 한다.
 import express, { type Express, type Router } from 'express';
 import type { Pool } from 'pg';
+import { DeviceControl } from './device/control';
 import { DeviceIngest } from './device/ingest';
 import { createDeviceRouter } from './device/routes';
 import { errorHandler, HttpError, notFoundHandler } from './http/errors';
@@ -8,7 +9,13 @@ import type { SessionManager } from './sessions/manager';
 import { createSessionRouter } from './sessions/routes';
 
 // web은 웹앱 빌드를 내보내는 라우터다. 빌드가 없으면 null이고, 그때는 API만 연다. (T31)
-export function createApp(pool: Pool, sessions: SessionManager, web: Router | null): Express {
+// deviceCtrlSocket이 있으면 웹의 녹음 시작·종료 버튼이 기기에 명령을 보낸다 (HW-2).
+export function createApp(
+  pool: Pool,
+  sessions: SessionManager,
+  web: Router | null,
+  deviceCtrlSocket: string | null = null,
+): Express {
   const app = express();
   app.use(express.json());
 
@@ -23,9 +30,11 @@ export function createApp(pool: Pool, sessions: SessionManager, web: Router | nu
   });
 
   // API는 모두 /api 아래에 둔다.
-  app.use('/api/sessions', createSessionRouter(pool, sessions));
+  const ingest = new DeviceIngest(pool, sessions);
+  const control = deviceCtrlSocket ? new DeviceControl(deviceCtrlSocket, pool, sessions, ingest) : null;
+  app.use('/api/sessions', createSessionRouter(pool, sessions, control));
   // 기기(audiostackd)가 세션 통지와 인식 결과를 보내는 경로 (T20). 데몬 설정 [backend]의 경로 세 줄을 여기로 맞춘다.
-  app.use('/api/device/sessions', createDeviceRouter(new DeviceIngest(pool, sessions)));
+  app.use('/api/device/sessions', createDeviceRouter(ingest));
 
   // 웹앱은 API 뒤에 둔다. API 경로는 웹 라우터가 건드리지 않고 아래 404로 넘긴다.
   if (web) app.use(web);
