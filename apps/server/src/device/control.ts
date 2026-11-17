@@ -1,6 +1,7 @@
 // 웹의 녹음 시작·종료 버튼을 기기(audiostackd)에 전한다 (HW-2).
 // DEVICE_CTRL_SOCKET이 있으면 버튼이 mock 대신 데몬의 ctrl.sock에 session start / session stop을 보낸다.
-// 서버 세션은 지금처럼 데몬의 세션 통지(DeviceIngest)가 만들고 닫는다. 여기서는 그것을 기다려 돌려줄 뿐이다.
+// 시작: `OK sess-…` 응답 번호로 서버 세션을 먼저 만든다(T19 '시작과 종료'). 뒤에 오는 데몬 통지는 같은 번호라 무시된다.
+// 종료: 데몬의 `/end`로 세션이 닫히기를 기다린다. 기기에 닿지 못하거나 시간이 지나면 서버에서 닫는다.
 import net from 'node:net';
 import type { Session } from '@app/shared';
 import type { Pool } from 'pg';
@@ -9,8 +10,6 @@ import { findSession } from '../sessions/repository';
 import type { SessionManager } from '../sessions/manager';
 import type { DeviceIngest } from './ingest';
 
-// 데몬의 세션 통지가 서버에 닿기까지 기다리는 시간
-const BEGIN_WAIT_MS = 5_000;
 // 데몬은 엔진의 session_done을 최대 5초 기다린 뒤 /end를 보낸다.
 const END_WAIT_MS = 10_000;
 
@@ -66,21 +65,42 @@ export class DeviceControl {
     return reply.slice(2).trim();
   }
 
-  // 녹음 시작. 데몬이 세션 번호를 정하고, 그 세션 통지로 서버 세션이 생기면 돌려준다.
+  // 녹음 시작. 데몬이 정한 세션 번호로 서버 세션을 만들어 돌려준다.
   async start(): Promise<Session> {
-    const deviceId = await this.command('session start');
-    const sessionId = await waitUntil(() => this.ingest.sessionIdOf(deviceId), BEGIN_WAIT_MS);
-    const active = this.sessions.getActive();
-    if (sessionId === undefined || active?.id !== sessionId) {
-      throw new HttpError(504, 'DEVICE_TIMEOUT', `기기 세션 ${deviceId}의 시작 통지가 오지 않았습니다`);
+    let deviceId = await this.command('session start');
+    let session = await this.follow(deviceId);
+    if (!session) {
+      // 데몬이 이미 녹음 중인데 그 세션을 서버가 따라가지 못한다(예: 앞서 기기에 닿지 못해 서버에서만 닫은 세션).
+      // 기기 세션을 닫고 새로 연다. 앞 세션의 늦은 결과와 /end는 DeviceIngest가 처리한다.
+      console.log(`[device] 기기 세션 ${deviceId}를 따라갈 수 없어 새로 시작합니다`);
+      await this.command('session stop');
+      deviceId = await this.command('session start');
+      session = await this.follow(deviceId);
     }
-    return active;
+    if (!session) throw new HttpError(502, 'DEVICE_ERROR', `기기 세션 ${deviceId}를 시작하지 못했습니다`);
+    return session;
+  }
+
+  // 기기 세션 번호로 서버 세션을 만들거나(이미 있으면 그대로) 찾는다. 녹음 중인 서버 세션이 아니면 undefined.
+  private async follow(deviceId: string): Promise<Session | undefined> {
+    if (!deviceId.startsWith('sess-')) throw new HttpError(502, 'DEVICE_ERROR', `기기 응답에 세션 번호가 없습니다: ${deviceId}`);
+    await this.ingest.begin({ session_id: deviceId });
+    const sessionId = this.ingest.sessionIdOf(deviceId);
+    const active = this.sessions.getActive();
+    return sessionId !== undefined && active?.id === sessionId ? active : undefined;
   }
 
   // 녹음 종료. 기기 세션이 아니면(예: mock) 지금처럼 바로 닫는다.
   async stop(id: number): Promise<Session> {
     if (!this.ingest.isCurrent(id)) return this.sessions.stop(id);
-    await this.command('session stop');
+    try {
+      await this.command('session stop');
+    } catch (error) {
+      // 기기에 닿지 못하거나(503) 거절되면(502) 서버 세션이 녹음 중으로 남지 않게 서버에서 닫는다.
+      const reason = error instanceof Error ? error.message : String(error);
+      console.log(`[device] #${id} 기기에 종료를 보내지 못해 서버에서 닫습니다: ${reason}`);
+      return this.sessions.stop(id);
+    }
     // 데몬이 마지막 final과 /end를 보내면 DeviceIngest가 세션을 닫는다.
     const ended = await waitUntil(() => (this.sessions.getActive()?.id === id ? undefined : true), END_WAIT_MS);
     if (!ended) {

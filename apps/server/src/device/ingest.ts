@@ -27,6 +27,8 @@ export class DeviceIngest {
   private current: DeviceSession | undefined;
   // 이미 닫았지만 늦은 final을 아직 받는 기기 세션
   private readonly closing = new Map<string, { session: DeviceSession; timer: NodeJS.Timeout }>();
+  // 처리 중인 시작 통지. 웹 버튼(DeviceControl)과 데몬 통지가 같은 번호로 동시에 와도 세션을 하나만 만든다.
+  private readonly beginning = new Map<string, Promise<IngestReply>>();
 
   constructor(pool: Pool, sessions: SessionManager) {
     this.pool = pool;
@@ -34,9 +36,25 @@ export class DeviceIngest {
   }
 
   // POST /api/device/sessions { session_id, started_at, device }
+  // 웹 버튼으로 시작할 때는 DeviceControl이 `session start`의 응답 번호로 먼저 부른다(T19 '시작과 종료').
   async begin(body: unknown): Promise<IngestReply> {
     const deviceId = (body as { session_id?: unknown } | null)?.session_id;
     if (typeof deviceId !== 'string' || deviceId === '') return this.ignore('session_id가 없는 세션 통지');
+    const running = this.beginning.get(deviceId);
+    if (running) {
+      const reply = await running;
+      return accepted({ sessionId: reply.body.sessionId ?? null, ignored: 'already known' }, 201);
+    }
+    const work = this.beginNew(deviceId);
+    this.beginning.set(deviceId, work);
+    try {
+      return await work;
+    } finally {
+      this.beginning.delete(deviceId);
+    }
+  }
+
+  private async beginNew(deviceId: string): Promise<IngestReply> {
     // 같은 통지가 다시 옴(재전송)
     if (this.current?.deviceId === deviceId || this.closing.has(deviceId)) {
       return accepted({ sessionId: this.current?.sessionId ?? null, ignored: 'already known' }, 201);
