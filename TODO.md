@@ -78,7 +78,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
   - 정할 것: STT 호출 방법, 오디오 입력 형식, partial/final 이벤트 형식
 - [ ] D7(팀 전체 마일스톤과 주차별 일정) — '가능한 빨리'로 적힌 항목입니다. D4 협의 때 함께 꺼낼 수 있습니다.
 - [ ] 박지윤에게 PR #1 병합 방식 알리기 (T20 push 전)
-- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. AI-1~7은 2026-11-15 모두 답 받음(`docs/team-questions.md` 2장 AI 절). 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류. 2026-11-16 AI-8~10은 `stt-engine` #2로 보냄, HW-12는 노션. 2026-11-16 김범수가 노션 댓글로 HW-1·2·3·4·6·7·10·12에 답함(HW-12 잠정, HW-5·HW-8 답 없음, `docs/team-questions.md` 2장 HW 절)
+- [ ] 팀원에게 남은 질문 보내기 — 2026-11-14 HW-1~8·HW-10은 `audio-stack` #3, AI-1~7은 `stt-engine` #1 이슈로 보냄. AI-1~7은 2026-11-15 모두 답 받음(`docs/team-questions.md` 2장 AI 절). 남은 것: ALL-1~2 단체방(`docs/team-questions.md` 4장 '두 분께'), HW-9·HW-11은 보류. 2026-11-16 AI-8~10은 `stt-engine` #2로 보냄, HW-12는 노션. 2026-11-16 김범수가 노션 댓글로 HW-1·2·3·4·6·7·10·12에 답함(HW-12 잠정, HW-5·HW-8은 2026-11-17 답함(Codeberg `32124c7`), `docs/team-questions.md` 2장 HW 절). 남은 것: 박지윤에게 `SESSION_BEGIN.t_us` 엔진 반영 확인(HW-8)
 - [x] 박지윤에게 T26 결과 알리기(FastRPC 설치 방법, 긴 문장 반복, 잡음 옵션 빈 final) — 2026-11-16 `stt-engine` #2로 보냄(AI-8~10)
 - [x] 김범수에게 T26 결과 노션에 올리기(HW-12) — 2026-11-16 노션 페이지 '범수님 질문 (이광호)'에 올림, 잠정 답 받음
 - [ ] 집 공유기에서 보드 IP 고정(DHCP 예약) — 보드 와이파이 MAC 주소 필요(보드에서 `ip link`) (T26은 학교·핫스팟에서 해서 급하지 않음)
@@ -163,6 +163,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-17 | 김범수 HW-5·HW-8 답 정리 | 완료 | 브랜치 `docs/hw5-hw8-answers`. 노션 새 댓글 2개(HW-5·HW-8, 둘 다 `32124c7` 적용)를 확인하고 Codeberg `32124c7`을 읽어 `team-questions.md`에 답·확인한 것·앱에서 할 일로 반영. T34 6단계 `sed`를 새 설정에 다시 확인. 코드 변경 없음 | `stt-engine`의 `t_us` 반영(박지윤), PR #2의 `BUSY`→`503`, HW-9 보류. 커밋 안 함 | T34(목요일 전) |
 | 2026-11-17 | PR #2 리뷰 | 완료 | 박지윤 web-app PR #2(`5056a4b`, `DEVICE_CTRL_SOCKET`이면 웹 버튼이 `ctrl.sock`에 `session start`·`stop`)를 읽고 `ingest.ts`·`manager.ts`·`RecordPage.tsx`, 데몬 `ipc_server.cpp`, audio-stack PR #4와 대조. PR 브랜치에서 typecheck·테스트 42개 통과. 사용자 허락으로 줄 코멘트 2개를 올림(`control.ts:71` 서버를 다시 켠 뒤 계속 504, `control.ts:83` 기기에 연결 못 하면 종료 불가). 브랜치 `docs/pr2-review`, 코드 변경 없음 | 실제 기기 동작 확인 안 함. 박지윤 답 기다림, 병합 시점 미정. 병합하면 `CLAUDE.md`·`project-overview.md`에 `DEVICE_CTRL_SOCKET` 추가. 커밋 안 함 | PR #2 답 확인, T34 보드 시험 |
 | 2026-11-17 | main push | 완료 | 사용자 요청으로 `main` push(11개 커밋, `83cf101..858aa0f`: AI 답 정리, T26, T26 결과 공유, 김범수 노션 답, T34 지침서와 각 병합 기록). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 7개이고 IP·비밀번호 값 없음 | 없음 | T34 보드 시험, 목요일 마이크 연결 |
 | 2026-11-17 | T34 | 진행 중 | 브랜치 `docs/t34-guide`, 지침서 `docs/guides/T34.md`. 사용자 결정 4개(범위 웹 자막까지, PipeWire, 새 작업 T34, 목요일 HW 마이크). 블루투스 방식 조사(매뉴얼은 PipeWire, Ubuntu 24.04 PipeWire 1.0.5·WirePlumber 0.4.17, BlueALSA는 mSBC 없음), Codeberg `3a03c28` 데몬 장치 열기 확인, Mac에서 `sed`·`level.py` 확인. 코드 변경 없음 | 보드 시험 전. 커밋 `d146c91`, `main` 병합(fast-forward), push 안 함 | T34 보드 시험, 목요일 마이크 연결 |
