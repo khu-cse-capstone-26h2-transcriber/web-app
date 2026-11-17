@@ -163,6 +163,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-17 | main push (두 번째) | 완료 | 사용자 요청으로 `main` push(3개 커밋, `b96f24c..b8af6d1`: PR #2 리뷰 기록, 김범수 HW-5·HW-8 답 정리와 병합 기록). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 3개이고 IP·비밀번호 값 없음 | 없음 | T34 보드 시험, 목요일 마이크 연결 |
 | 2026-11-17 | 김범수 HW-5·HW-8 답 정리 | 완료 | 브랜치 `docs/hw5-hw8-answers`. 노션 새 댓글 2개(HW-5·HW-8, 둘 다 `32124c7` 적용)를 확인하고 Codeberg `32124c7`을 읽어 `team-questions.md`에 답·확인한 것·앱에서 할 일로 반영. T34 6단계 `sed`를 새 설정에 다시 확인. 코드 변경 없음 | `stt-engine`의 `t_us` 반영(박지윤), PR #2의 `BUSY`→`503`, HW-9 보류. 커밋 `cb55953`, `main` 병합(fast-forward), push 안 함 | T34(목요일 전) |
 | 2026-11-17 | PR #2 리뷰 | 완료 | 박지윤 web-app PR #2(`5056a4b`, `DEVICE_CTRL_SOCKET`이면 웹 버튼이 `ctrl.sock`에 `session start`·`stop`)를 읽고 `ingest.ts`·`manager.ts`·`RecordPage.tsx`, 데몬 `ipc_server.cpp`, audio-stack PR #4와 대조. PR 브랜치에서 typecheck·테스트 42개 통과. 사용자 허락으로 줄 코멘트 2개를 올림(`control.ts:71` 서버를 다시 켠 뒤 계속 504, `control.ts:83` 기기에 연결 못 하면 종료 불가). 브랜치 `docs/pr2-review`, 코드 변경 없음 | 실제 기기 동작 확인 안 함. 박지윤 답 기다림, 병합 시점 미정. 병합하면 `CLAUDE.md`·`project-overview.md`에 `DEVICE_CTRL_SOCKET` 추가. 커밋 안 함 | PR #2 답 확인, T34 보드 시험 |
 | 2026-11-17 | main push | 완료 | 사용자 요청으로 `main` push(11개 커밋, `83cf101..858aa0f`: AI 답 정리, T26, T26 결과 공유, 김범수 노션 답, T34 지침서와 각 병합 기록). push 전 typecheck·테스트 42개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 7개이고 IP·비밀번호 값 없음 | 없음 | T34 보드 시험, 목요일 마이크 연결 |
