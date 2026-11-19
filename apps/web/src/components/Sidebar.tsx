@@ -1,9 +1,16 @@
 // 사이드바 내용(T38). 브랜드, 녹음·히스토리 메뉴, 최근 녹음, 아래쪽 서버 상태를 차례로 그린다.
 // 넓은 화면에서는 왼쪽에 늘 두고, 좁은 화면에서는 같은 내용을 서랍으로 연다(Layout.tsx).
-import { APP_NAME, SESSION_STATUS_LABELS, formatStartedAt, type SessionSummary } from '@app/shared';
+import {
+  APP_NAME,
+  SESSION_STATUS_LABELS,
+  formatStartedAt,
+  type Session,
+  type SessionSummary,
+} from '@app/shared';
 import { NavLink } from 'react-router';
 import type { Health } from '../api/endpoints';
 import type { ApiState } from '../api/useApiData';
+import { ElapsedTime } from './ElapsedTime';
 import { BrandMark, CloseIcon, HistoryIcon, MicIcon } from './icons';
 
 // 메뉴 항목. 지금 화면이면 밝은 배경을 깐다.
@@ -59,11 +66,13 @@ interface SidebarProps {
   health: ApiState<Health>;
   // 최근 녹음. 처음 불러오기 전이거나 없으면 이 절을 숨긴다.
   recent: SessionSummary[] | null;
+  // 진행 중인 녹음. 있으면 첫 메뉴를 '녹음 중'과 흐른 시간으로 바꾼다(T39).
+  activeSession: Session | null;
   // 서랍으로 열었을 때만 준다. 브랜드 옆에 닫기 버튼을 둔다.
   onClose?: () => void;
 }
 
-export function Sidebar({ health, recent, onClose }: SidebarProps) {
+export function Sidebar({ health, recent, activeSession, onClose }: SidebarProps) {
   return (
     <div className="flex h-full flex-col overflow-y-auto bg-side px-3.5 pt-5 pb-[18px]">
       <div className="flex items-center">
@@ -87,8 +96,20 @@ export function Sidebar({ health, recent, onClose }: SidebarProps) {
 
       <nav className="mt-[22px] flex flex-col gap-0.5">
         <NavLink to="/" end className={menuClass}>
-          <MicIcon className="size-4" />
-          녹음
+          {activeSession ? (
+            <>
+              <span className="mx-[3px] size-[9px] flex-none rounded-full bg-rec ring-3 ring-rec/25" />
+              녹음 중
+              <span className="ml-auto text-[13px] font-bold text-rec-text tabular-nums">
+                <ElapsedTime startedAt={activeSession.startedAt} />
+              </span>
+            </>
+          ) : (
+            <>
+              <MicIcon className="size-4" />
+              녹음
+            </>
+          )}
         </NavLink>
         <NavLink to="/history" className={menuClass}>
           <HistoryIcon className="size-4" />
