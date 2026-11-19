@@ -22,6 +22,8 @@ export interface LayoutContext {
   activeSession: Session | null;
   // 녹음 화면이 지금 녹음 상태를 알린다. 녹음 화면에 있는 동안은 틀이 따로 확인하지 않고 이 값을 쓴다.
   reportActiveSession: (session: Session | null) => void;
+  // 진행 중이던 녹음이 끝날 때마다 1씩 는다. 끝난 녹음 목록(히스토리 목록)을 다시 불러올 때 쓴다(T40).
+  historyRound: number;
 }
 
 export function Layout() {
@@ -40,19 +42,24 @@ export function Layout() {
   useActiveSessionPolling(!onRecordPage, reportActiveSession);
 
   // 최근 녹음은 처음 열 때와, 진행 중이던 녹음이 끝났을 때(번호가 바뀌거나 없어질 때) 다시 불러온다.
-  // 목록에는 끝난 녹음만 들어오므로 이때만 바뀐다.
+  // 목록에는 끝난 녹음만 들어오므로 이때만 바뀐다. 히스토리 목록 화면도 같은 번호를 쓴다.
   const activeId = activeSession?.id ?? null;
-  const [recentRound, setRecentRound] = useState(0);
+  const [historyRound, setHistoryRound] = useState(0);
   const prevActiveIdRef = useRef<number | null>(null);
   useEffect(() => {
     if (prevActiveIdRef.current !== null && prevActiveIdRef.current !== activeId) {
-      setRecentRound((n) => n + 1);
+      setHistoryRound((n) => n + 1);
     }
     prevActiveIdRef.current = activeId;
   }, [activeId]);
-  const recent = useRecentSessions(RECENT_LIMIT, recentRound);
+  const recent = useRecentSessions(RECENT_LIMIT, historyRound);
 
-  const context: LayoutContext = { recheckServer: recheck, activeSession, reportActiveSession };
+  const context: LayoutContext = {
+    recheckServer: recheck,
+    activeSession,
+    reportActiveSession,
+    historyRound,
+  };
 
   // 좁은 화면의 서랍. 닫으면 키보드 초점을 메뉴 버튼으로 돌려준다.
   const [menuOpen, setMenuOpen] = useState(false);

@@ -1,17 +1,12 @@
 // 사이드바 내용(T38). 브랜드, 녹음·히스토리 메뉴, 최근 녹음, 아래쪽 서버 상태를 차례로 그린다.
 // 넓은 화면에서는 왼쪽에 늘 두고, 좁은 화면에서는 같은 내용을 서랍으로 연다(Layout.tsx).
-import {
-  APP_NAME,
-  SESSION_STATUS_LABELS,
-  formatStartedAt,
-  type Session,
-  type SessionSummary,
-} from '@app/shared';
+import { APP_NAME, formatStartedAt, type Session, type SessionSummary } from '@app/shared';
 import { NavLink } from 'react-router';
 import type { Health } from '../api/endpoints';
 import type { ApiState } from '../api/useApiData';
 import { ElapsedTime } from './ElapsedTime';
 import { BrandMark, CloseIcon, HistoryIcon, MicIcon } from './icons';
+import { StatusBadge } from './StatusBadge';
 
 // 메뉴 항목. 지금 화면이면 밝은 배경을 깐다.
 function menuClass({ isActive }: { isActive: boolean }): string {
@@ -51,11 +46,7 @@ function RecentItem({ session }: { session: SessionSummary }) {
       <span className="flex items-center gap-1.5 text-xs text-muted tabular-nums">
         <b className="font-bold text-text3">#{session.id}</b>
         {formatStartedAt(session.startedAt)}
-        {session.status === 'interrupted' && (
-          <span className="flex-none rounded-[5px] bg-warn/12 px-[7px] py-0.5 text-[11px] font-bold text-warn">
-            {SESSION_STATUS_LABELS[session.status]}
-          </span>
-        )}
+        {session.status === 'interrupted' && <StatusBadge status={session.status} small />}
       </span>
       <span className="mt-[3px] block truncate text-[13px] text-text3">{session.preview}</span>
     </NavLink>
