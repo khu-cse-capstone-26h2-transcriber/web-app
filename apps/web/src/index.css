@@ -1,0 +1,71 @@
+/* 웹앱 전체 스타일(T38). Tailwind CSS 4를 쓰고, 색은 확정 디자인(2026-11-19, 시안 A)의 값만 토큰으로 둔다.
+   Tailwind 기본 색은 지워, 확정안에 없는 색이 섞이지 않게 한다. 글꼴 Pretendard는 main.tsx에서 불러온다. */
+@import 'tailwindcss';
+
+@theme {
+  --color-*: initial;
+
+  /* 확정안 색 이름 */
+  --color-bg: #0f1115; /* 본문 배경 */
+  --color-side: #0b0d10; /* 사이드바 */
+  --color-surface: #171a21; /* 카드·행 */
+  --color-surface2: #1f232b; /* 선택된 메뉴, 어두운 버튼 */
+  --color-text: #f2f3f5; /* 제목, 최신 확정 문장 */
+  --color-muted: #8b919c; /* 보조 글 */
+  --color-faint: #6e7480; /* 시각, 안내 */
+  --color-rec: #ff5a4e; /* 녹음, 오류 */
+  --color-ok: #3dd68c; /* 정상, 종료됨 */
+  --color-warn: #f5b84a; /* 중단됨, 끊김 */
+
+  /* 확정안 HTML이 함께 쓰는 색 */
+  --color-line: #1f232b; /* 구분선 */
+  --color-line2: #2a2f38; /* 작은 버튼 테두리 */
+  --color-card-line: #20242c; /* 카드 테두리 */
+  --color-chip-line: #232831; /* 정보 칩 테두리 */
+  --color-soft: #e4e6ea; /* 목록 제목, 어두운 버튼 글 */
+  --color-text2: #d6d9de; /* 저장된 문장 */
+  --color-text3: #c9cdd4; /* 사이드바 글, 작은 버튼 글 */
+  --color-dim: #5a606b; /* 화살표, 막힌 작은 버튼 글 */
+  --color-rec-text: #ff8a80; /* 녹음 중 글, 오류 문구 */
+  --color-ok-text: #7ee2b0;
+  --color-ok-bg: #10261c;
+  --color-ok-line: #1c4a33;
+  --color-warn-text: #f5c76a; /* 끊김 배너, 안내 문구 */
+  --color-warn-bg: #2e2510;
+  --color-warn-line: #5a4614;
+  --color-warn-button: #8a6b1f; /* 배너 버튼 테두리 */
+  --color-off-bg: #1a1d23; /* 막힌 내려받기 버튼 */
+  --color-off-text: #4b515c;
+  --color-off-line: #22262e; /* 막힌 작은 버튼 테두리 */
+  --color-overlay: #050608; /* 서랍 뒤 어두운 막 */
+  --color-white: #ffffff;
+
+  /* 자막 단계. 오래된 확정 문장일수록 흐리다(cap0이 가장 오래됨). partial은 말하는 중인 문장 */
+  --color-cap0: #2a2e36;
+  --color-cap1: #3c414b;
+  --color-cap2: #5a606b;
+  --color-cap3: #8e949e;
+  --color-partial: #6b717c;
+
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    /* 한국어는 낱말 중간에서 줄을 바꾸지 않는다. 너무 긴 낱말만 자른다 */
+    word-break: keep-all;
+    overflow-wrap: break-word;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
+  }
+}
