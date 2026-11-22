@@ -1,6 +1,6 @@
 # 프로젝트 설명 — speech-transcriber
 
-마지막 갱신: 2026-11-09 · 이광호
+마지막 갱신: 2026-11-22 · 이광호
 
 이 문서는 프로젝트가 무엇이고 어떻게 구성되는지 설명합니다. 확정된 내용만 적고, 아직 만들지 않은 부분은 작업 번호와 함께 '예정'으로 표시합니다. 작업 목록과 진행 상황은 [`TODO.md`](../TODO.md)가 기준입니다.
 
@@ -43,7 +43,7 @@ flowchart LR
 | STT 어댑터 | `apps/server/src/stt` | STT 구현체와 서버 사이의 경계. 서버의 다른 코드는 `SttAdapter` 인터페이스만 봅니다 | 구현됨 (T05). 웹 '녹음 시작'은 `STT_MODE`로 고른 구현체를 씀: 기본 mock, `local`이면 노트북에서 실제 모델 엔진을 띄우는 실험용 구현체 (T28). 기기가 세션을 시작하면 기기 결과를 받는 `DeviceSttAdapter`를 씀 (T20) |
 | 실제 STT | AI 파트 `stt-engine` 저장소 (2026-11-18 공개로 바뀜) | 기기 안에서 음성을 인식합니다. `audiostackd`에게서 오디오를 받아 결과를 돌려주고, 데몬이 결과를 서버로 보냅니다 | 엔진은 보드 NPU에서 동작함(AI 파트, 2026-11-09). 서버는 데몬이 보낸 결과를 `/api/device/sessions`로 받아 세션에 넣음 (T20, 박지윤의 web-app PR #1 병합). 노트북에서 ONNX 엔진과 `feed_wav.py`로 웹 자막, DB, 히스토리, 내보내기까지 확인함 (T29, T20). 실제 데몬과 보드에서는 T26에서 확인. 수신 경로 이름은 하드웨어 파트 동의가 남음 (T19) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11). 기기 결과 수신 경로 `/api/device/sessions` (T20) |
-| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 기기에서의 구성은 미정 (D5, D8) |
+| DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 보드에서는 `apt`로 설치한 PostgreSQL 16을 씀 (T21). SQLite로 바꾸지 않음 (D8, 2026-11-22) |
 | 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음하지 않는 동안 2초마다 진행 중인 녹음 확인 (T20). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS`, `ExportFormat`, `EXPORT_FORMATS` |
 
@@ -66,7 +66,8 @@ flowchart LR
 | 개발 환경 | 노트북에서 먼저 개발. STT·DB 주소는 환경변수로 분리 |
 | STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
 | 테스트 | Vitest 5, 핵심 로직만(내보내기 포매터, 이벤트 재개, 세그먼트 병합). 루트에서 `npm test` (T17) |
-| 백엔드 위치 | Rubik Pi 안을 목표로 설계. 실측 결과에 따라 SQLite 또는 별도 서버로 바뀔 수 있음 |
+| 백엔드 위치 | Rubik Pi 안. 보드 한 대에서 엔진, 앱 서버, PostgreSQL을 함께 돌려 동작을 확인함 (T26 2026-11-16, T27 2026-11-18) |
+| 보드의 DB | PostgreSQL 16을 그대로 씀. SQLite로 바꾸지 않고 메모리 설정은 기본값 (D8, 2026-11-22 앱 파트 결정. 2차 멘토링 의견, T26 측정: 19분 녹음 중 PostgreSQL 약 30 MB, 전체 7.1 GiB 중 최대 약 1.28 GB 사용) |
 | 기기 OS | Rubik Pi 3에 Ubuntu 24.04 (2026-11-10 앱 파트 결정, 기기는 앱 파트가 보관). AI 파트가 측정한 보드도 Ubuntu 24.04 (2026-11-09) |
 | STT 엔진 | `seastar105/whisper-small-komixv2`를 QNN으로 변환해 NPU에서 실행. `audiostackd`의 `engine.sock`에 접속하는 별도 프로그램(`stt-engine` 저장소). 결과 형식과 세션 처리 규칙은 `stt-engine`의 `ENGINE_CONTRACT.md` (AI 파트 결정, 2026-11-09) |
 | 엔진 입력 오디오 | 16 kHz 모노 S16_LE를 20 ms(640바이트)씩. 마이크는 `audiostackd`만 열고, 앱 서버는 오디오를 다루지 않음 (하드웨어 파트 구현) |
@@ -77,7 +78,6 @@ flowchart LR
 - STT 연동 방식: 녹음 시작·종료 주체와 세션 번호 발급, 서버의 수신 경로 (D4, 하드웨어 파트 합의가 남음). 엔진 결과 형식과 오디오 형식은 정해짐
 - Rubik Pi 입출력 구성(마이크는 3.5 mm 포트를 쓸 계획. `audio-stack` 기본 설정은 3.5 mm 헤드셋이고 XVF3800 USB 마이크 설정도 있음) (D5, 하드웨어 파트 협의)
 - 팀 전체 마일스톤과 주차별 일정 (D7)
-- PostgreSQL 메모리 설정, SQLite 전환 여부 (D8, 기기 실측 후)
 
 ## 폴더 구조
 
