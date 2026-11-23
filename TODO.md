@@ -10,7 +10,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 - 일자별 상세 기록은 `docs/logs/YYYY-MM-DD.md`에 있습니다.
 - 프로젝트 설명은 `docs/project-overview.md`에 있습니다.
 
-마지막 갱신: 2026-11-22
+마지막 갱신: 2026-11-23
 
 ## 오늘의 작업 (2026-11-02) — 실제 모델 연동과 Rubik Pi 올리기 준비
 
@@ -171,6 +171,7 @@ Claude Code가 작업하면서 직접 갱신하는 파일입니다. 끝낸 항�
 
 | 날짜 | 작업 ID | 상태 | 한 일 | 막힌 점·남은 일 | 다음에 할 작업 |
 | --- | --- | --- | --- | --- | --- |
+| 2026-11-23 | main push | 완료 | 사용자 요청으로 `main` push(3개 커밋, `d79299a..6761312`: 11-19 세 번째 push 기록, 2차 멘토링 결과 반영과 병합 기록). push 전 typecheck·테스트 48개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 5개이고 IP·토큰·비밀번호 값 없음 | 이 기록 커밋은 push 안 함 | T35~T37, T41 |
 | 2026-11-22 | 2차 멘토링 결과 반영 | 완료 | 멘토 의견 4가지 정리(일지). D8을 PostgreSQL 유지·메모리 설정 기본값으로 닫음(사용자 결정, `project-overview.md`·로컬 `CLAUDE.md`). AI-9 멘토 의견과 엔진 필터 확인을 `team-questions.md`에 적고 `stt-engine` #2 댓글로 보냄. T41·시연 네트워크 메모 추가. 브랜치 `docs/mentoring-2-feedback`, 코드 변경 없음. 커밋 `08b1661`, `main`에 병합(fast-forward) | push 안 함. 박지윤 AI-9 답 기다림 | T35~T37, T41 |
 | 2026-11-19 | main push (세 번째) | 완료 | 사용자 요청으로 `main` push(1개 커밋, `a56b28d..d79299a`: 두 번째 push 기록). push 전 typecheck·테스트 48개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 2개이고 IP·비밀번호 값 없음 | 이 기록 커밋은 push 안 함 | Figma 확정안 넣기(한도가 풀리면), T35~T37 |
 | 2026-11-19 | main push (두 번째) | 완료 | 사용자 요청으로 `main` push(1개 커밋, `808d484..a56b28d`: 첫 번째 push 기록). push 전 typecheck·테스트 48개 통과, 작성자 이메일 noreply, 바뀐 것은 문서 2개이고 IP·토큰·비밀번호 값 없음 | 이 기록 커밋은 push 안 함 | Figma 확정안 넣기(한도가 풀리면), T35~T37 |
