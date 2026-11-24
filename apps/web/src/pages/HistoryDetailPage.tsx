@@ -32,9 +32,8 @@ function SessionView({ detail }: { detail: SessionDetail }) {
     <>
       <div className="mt-3.5 flex flex-wrap items-end gap-4">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-bold tracking-[-0.6px] md:text-[30px]">녹음 #{session.id}</h1>
+          <h1 className="text-[26px] font-bold tracking-[-0.6px] md:text-[30px]">{formatStartedAt(session.startedAt)} 녹음</h1>
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            <Chip>{formatStartedAt(session.startedAt)} 시작</Chip>
             <Chip>길이 {formatDuration(recordingLengthMs(segments))}</Chip>
             <StatusBadge status={session.status} />
           </div>
@@ -81,7 +80,7 @@ export function HistoryDetailPage() {
         <SessionView detail={detail.data} />
       ) : (
         <>
-          <h1 className="mt-3.5 text-[26px] font-bold tracking-[-0.6px] md:text-[30px]">녹음 #{id}</h1>
+          <h1 className="mt-3.5 text-[26px] font-bold tracking-[-0.6px] md:text-[30px]">녹음</h1>
           {detail.status === 'loading' && <p className="mt-4 text-sm text-muted">불러오는 중…</p>}
           {detail.status === 'error' && (
             <p role="alert" className="mt-4 text-sm text-rec-text">

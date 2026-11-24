@@ -10,12 +10,7 @@ import { ChevronRightIcon } from '../components/icons';
 import type { LayoutContext } from '../components/Layout';
 import { StatusBadge } from '../components/StatusBadge';
 
-// 번호 뒤 조사. 숫자를 읽은 소리의 끝에 받침이 없으면(끝자리 2·4·5·9) '는', 있으면 '은'이다.
-function topicParticle(id: number): string {
-  return [2, 4, 5, 9].includes(id % 10) ? '는' : '은';
-}
-
-// 목록의 카드 한 장. 번호, 시작 시각, 문장 수, 중단됐으면 표시, 아래에 첫 문장을 한 줄로 자른다.
+// 목록의 카드 한 장. 시작 시각, 문장 수, 중단됐으면 표시, 아래에 첫 문장을 한 줄로 자른다.
 // 목록에는 끝난 세션만 오므로, 중단된 세션에만 상태를 붙인다.
 function SessionCard({ session }: { session: SessionSummary }) {
   return (
@@ -24,12 +19,9 @@ function SessionCard({ session }: { session: SessionSummary }) {
         to={`/history/${session.id}`}
         className="flex items-center gap-3.5 rounded-[14px] border border-card-line bg-surface px-4 py-[15px] hover:border-line2 hover:bg-surface2/60 md:gap-[22px] md:px-[22px] md:py-[17px]"
       >
-        <span className="w-9 flex-none text-[15px] font-bold text-faint tabular-nums md:w-[42px]">
-          #{session.id}
-        </span>
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-[15px] font-medium text-soft tabular-nums">
+            <span className="text-[15px] font-bold text-soft tabular-nums">
               {formatStartedAt(session.startedAt)}
             </span>
             <span className="text-[13px] text-muted">
@@ -81,8 +73,7 @@ export function HistoryListPage() {
 
       {activeSession && (
         <p className="mt-auto pt-6 text-[13px] text-faint">
-          녹음 중인 #{activeSession.id}
-          {topicParticle(activeSession.id)} 끝난 뒤 목록에 나타납니다.
+          {formatStartedAt(activeSession.startedAt)}에 시작한 녹음은 끝난 뒤 목록에 나타납니다.
         </p>
       )}
     </section>
