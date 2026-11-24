@@ -34,7 +34,7 @@ export function ServerStatus({ health, className }: { health: ApiState<Health>; 
   );
 }
 
-// 최근 녹음 한 줄. 번호와 시작 시각, 중단된 녹음이면 표시, 아래에 첫 문장을 한 줄로 자른다.
+// 최근 녹음 한 줄. 시작 시각, 중단된 녹음이면 표시, 아래에 첫 문장을 한 줄로 자른다.
 function RecentItem({ session }: { session: SessionSummary }) {
   return (
     <NavLink
@@ -44,8 +44,7 @@ function RecentItem({ session }: { session: SessionSummary }) {
       }
     >
       <span className="flex items-center gap-1.5 text-xs text-muted tabular-nums">
-        <b className="font-bold text-text3">#{session.id}</b>
-        {formatStartedAt(session.startedAt)}
+        <b className="font-bold text-text3">{formatStartedAt(session.startedAt)}</b>
         {session.status === 'interrupted' && <StatusBadge status={session.status} small />}
       </span>
       <span className="mt-[3px] block truncate text-[13px] text-text3">{session.preview}</span>

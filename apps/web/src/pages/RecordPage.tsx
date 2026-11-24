@@ -89,7 +89,7 @@ export function RecordPage() {
       // 웹은 왜 끝났는지 모르므로(기기 세션 시작, 서버 재시작 뒤 기기 세션 등) 이유는 쓰지 않는다.
       setNotice({
         tone: 'info',
-        text: `#${sessionId} 녹음이 끝나, 진행 중인 녹음(#${next.id})을 보여 줍니다`,
+        text: `녹음이 끝나, 진행 중인 녹음(${formatStartedAt(next.startedAt)} 시작)을 보여 줍니다`,
       });
       setPhase({ kind: 'recording', session: next });
       return;
@@ -172,7 +172,7 @@ export function RecordPage() {
       const apiError = toApiError(error);
       if (apiError.code === 'SESSION_NOT_ACTIVE' || apiError.code === 'SESSION_NOT_FOUND') {
         // 다른 탭이나 기기 버튼으로 이미 끝난 녹음이다. 지금 상태를 다시 확인한다.
-        setNotice({ tone: 'info', text: `이미 끝난 녹음입니다 (#${session.id})` });
+        setNotice({ tone: 'info', text: `이미 끝난 녹음입니다 (${formatStartedAt(session.startedAt)} 시작)` });
         await checkActive();
         return;
       }
@@ -230,8 +230,7 @@ export function RecordPage() {
               <ElapsedTime startedAt={live.session.startedAt} />
             </span>
             <span className="ml-auto text-sm text-muted tabular-nums md:ml-0">
-              #{live.session.id}
-              <span className="hidden md:inline"> · {formatStartedAt(live.session.startedAt)} 시작</span>
+              {formatStartedAt(live.session.startedAt)} 시작
             </span>
             {stopButton(live.session, 'hidden flex-none md:ml-auto md:flex')}
           </div>
