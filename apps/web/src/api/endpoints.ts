@@ -1,11 +1,6 @@
 // 서버 API 함수. 타입은 @app/shared를 쓴다. 세션 스트림(SSE)은 useSessionStream.ts에 있다.
-import type { ExportFormat, Segment, Session, SessionSummary } from '@app/shared';
+import type { ExportFormat, Health, Segment, Session, SessionSummary } from '@app/shared';
 import { type DownloadedFile, request, requestFile } from './client';
-
-// GET /health의 성공 응답. DB가 꺼져 있으면 503 DB_UNAVAILABLE로 실패한다.
-export interface Health {
-  status: 'ok';
-}
 
 // GET /api/sessions/:id의 응답.
 export interface SessionDetail {
@@ -13,6 +8,7 @@ export interface SessionDetail {
   segments: Segment[];
 }
 
+// 서버와 DB 상태, 기기 버튼이 있는지. DB가 꺼져 있으면 503 DB_UNAVAILABLE로 실패한다.
 export function getHealth(signal?: AbortSignal): Promise<Health> {
   return request<Health>('/health', { signal });
 }

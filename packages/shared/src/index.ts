@@ -10,6 +10,7 @@ export {
   formatStartedAt,
   recordingLengthMs,
 } from './format';
+export type { Health } from './health';
 export type { Segment } from './segment';
 export type { Session, SessionStatus, SessionSummary } from './session';
 export { STREAM_HEARTBEAT_MS } from './stream';

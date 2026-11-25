@@ -24,12 +24,22 @@ export interface LayoutContext {
   reportActiveSession: (session: Session | null) => void;
   // 진행 중이던 녹음이 끝날 때마다 1씩 는다. 끝난 녹음 목록(히스토리 목록)을 다시 불러올 때 쓴다(T40).
   historyRound: number;
+  // 기기에 물리 녹음 버튼이 있는지(T43). false면 녹음 화면의 웹 버튼이 주 제어라 크게 보인다.
+  deviceButton: boolean;
 }
 
 export function Layout() {
   // 서버와 DB 상태. 열 때와 30초마다, 실패한 동안에는 5초마다 다시 확인한다(T15, T25).
   // 녹음 중 실시간 연결이 끊긴 것은 녹음 화면 맨 위의 배너가 따로 알린다.
   const { health, recheck } = useServerHealth();
+
+  // 기기에 물리 녹음 버튼이 있는지는 서버 상태 확인(/health)에 함께 온다(T43).
+  // 확인이 실패하는 동안에는 마지막으로 받은 값을 두고, 한 번도 받지 못했으면 버튼 없음(웹 버튼이 주 제어)으로 본다.
+  const [deviceButton, setDeviceButton] = useState(false);
+  const reportedButton = health.status === 'success' ? health.data.deviceButton : undefined;
+  useEffect(() => {
+    if (reportedButton !== undefined) setDeviceButton(reportedButton);
+  }, [reportedButton]);
 
   // 진행 중인 녹음. 녹음 화면에서는 녹음 화면이 알려 주고(대기 중 2초 확인, 실시간 자막, 시작·종료),
   // 그 밖의 화면에서는 틀이 2초마다 확인한다. 어느 쪽이든 확인 요청은 하나다.
@@ -59,6 +69,7 @@ export function Layout() {
     activeSession,
     reportActiveSession,
     historyRound,
+    deviceButton,
   };
 
   // 좁은 화면의 서랍. 닫으면 키보드 초점을 메뉴 버튼으로 돌려준다.

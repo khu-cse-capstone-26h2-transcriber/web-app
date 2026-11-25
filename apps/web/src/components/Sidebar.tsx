@@ -1,8 +1,7 @@
 // 사이드바 내용(T38). 브랜드, 녹음·히스토리 메뉴, 최근 녹음, 아래쪽 서버 상태를 차례로 그린다.
 // 넓은 화면에서는 왼쪽에 늘 두고, 좁은 화면에서는 같은 내용을 서랍으로 연다(Layout.tsx).
-import { APP_NAME, formatStartedAt, type Session, type SessionSummary } from '@app/shared';
+import { APP_NAME, formatStartedAt, type Health, type Session, type SessionSummary } from '@app/shared';
 import { NavLink } from 'react-router';
-import type { Health } from '../api/endpoints';
 import type { ApiState } from '../api/useApiData';
 import { ElapsedTime } from './ElapsedTime';
 import { BrandMark, CloseIcon, HistoryIcon, MicIcon } from './icons';

@@ -1,9 +1,10 @@
 // 서버와 DB가 살아 있는지 /health로 확인하는 훅. 처음 한 번, 그 뒤 30초마다, recheck를 부를 때 다시 확인한다.
 // 확인이 실패하면 성공할 때까지 5초마다 다시 확인해, 서버가 다시 켜지면 곧 정상으로 돌아온다(T25).
 // 다시 확인하는 동안에는 직전 결과를 그대로 둔다(확인 중으로 깜빡이지 않게).
+import type { Health } from '@app/shared';
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, toApiError } from './client';
-import { getHealth, type Health } from './endpoints';
+import { getHealth } from './endpoints';
 import type { ApiState } from './useApiData';
 
 // 서버 상태를 다시 확인하는 간격(ms).

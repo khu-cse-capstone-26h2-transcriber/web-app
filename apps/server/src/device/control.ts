@@ -52,15 +52,24 @@ export class DeviceControl {
     private readonly ingest: DeviceIngest,
   ) {}
 
+  // 실패는 서버 기록에 남긴다. 연결 실패의 이유(소켓 경로가 든 connect ENOENT 등)는 화면에 보이지 않고 기록에만 둔다 (T43).
   private async command(command: string): Promise<string> {
     let reply: string;
     try {
       reply = await sendDeviceCommand(this.socketPath, command);
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
-      throw new HttpError(503, 'DEVICE_UNAVAILABLE', `기기에 연결하지 못했습니다: ${reason}`);
+      console.error(`[device] ${command} → 연결 실패: ${reason}`);
+      throw new HttpError(
+        503,
+        'DEVICE_UNAVAILABLE',
+        '기기에 연결하지 못했습니다. 기기의 녹음 프로그램이 켜져 있는지 확인해 주세요',
+      );
     }
-    if (!reply.startsWith('OK')) throw new HttpError(502, 'DEVICE_ERROR', `기기가 거절했습니다: ${reply}`);
+    if (!reply.startsWith('OK')) {
+      console.error(`[device] ${command} → 거절: ${reply}`);
+      throw new HttpError(502, 'DEVICE_ERROR', `기기가 거절했습니다: ${reply}`);
+    }
     console.log(`[device] ${command} → ${reply}`);
     return reply.slice(2).trim();
   }

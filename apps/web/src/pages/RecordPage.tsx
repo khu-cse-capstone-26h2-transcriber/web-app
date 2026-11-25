@@ -1,5 +1,6 @@
 // 녹음 화면 ('/'). 진행 중인 녹음의 상태를 보여 주고, 웹에서도 녹음을 시작·종료할 수 있게 한다.
-// 녹음의 주 제어는 기기의 물리 버튼이고, 이 화면의 버튼은 개발·시연·원격 종료용 보조 수단이다.
+// 기기에 물리 녹음 버튼이 없으면(서버 DEVICE_BUTTON, 기본) 이 화면의 버튼이 녹음의 주 제어라 크게 보인다.
+// 버튼이 있으면 기기 버튼이 주 제어이고, 이 화면의 버튼은 개발·시연·원격 종료용 보조 수단이라 작게 둔다(T43).
 // 녹음하지 않는 동안 2초마다 진행 중인 녹음을 확인해, 기기 버튼으로 시작한 녹음도 새로고침 없이 보인다(T20).
 // 녹음 중에는 위쪽 상태 줄 아래에 실시간 자막(T14)을 보인다. 어디서 끝냈든 녹음이 끝나면 히스토리 상세로 간다.
 // 자막 스트림이 끊기면 맨 위에 배너를 띄우고 다시 연결한다(T15). 끊긴 사이에 끝났어도 히스토리 상세로 간다.
@@ -34,12 +35,16 @@ interface Notice {
   text: string;
 }
 
-// 작은 테두리 버튼(녹음 시작·종료, 다시 확인). 웹 버튼은 보조라 작게 둔다. display는 쓰는 곳에서 정한다.
+// 작은 테두리 버튼(다시 확인, 기기 버튼이 있을 때의 녹음 시작·종료). display는 쓰는 곳에서 정한다.
 const BUTTON_BASE =
   'items-center justify-center gap-2 rounded-[10px] border border-line2 font-medium text-text3 hover:bg-surface disabled:border-off-line disabled:text-dim disabled:hover:bg-transparent';
 const SMALL_BUTTON = `${BUTTON_BASE} px-[15px] py-[9px] text-sm`;
 // 확인 실패 때의 '다시 확인'. 조금 더 작다(확정안 F-7).
 const RETRY_BUTTON = `${BUTTON_BASE} px-3 py-1.5 text-[13px]`;
+// 기기 버튼이 없을 때의 큰 버튼(T43). 시작은 채운 빨간 알약, 종료는 채운 흰 버튼(내려받기의 흰 버튼과 같은 색)이다.
+const BIG_DISABLED = 'disabled:bg-off-bg disabled:text-off-text';
+const BIG_START_BUTTON = `min-w-[220px] items-center justify-center gap-2.5 rounded-full bg-rec px-8 py-4 text-lg font-bold text-white hover:bg-rec/90 ${BIG_DISABLED}`;
+const BIG_STOP_BUTTON = `items-center justify-center gap-2.5 rounded-[12px] bg-text px-6 py-3.5 text-base font-bold text-bg hover:bg-white ${BIG_DISABLED}`;
 
 function NoticeText({ notice }: { notice: Notice }) {
   return notice.tone === 'error' ? (
@@ -55,7 +60,7 @@ function NoticeText({ notice }: { notice: Notice }) {
 
 export function RecordPage() {
   const navigate = useNavigate();
-  const { recheckServer, reportActiveSession } = useOutletContext<LayoutContext>();
+  const { recheckServer, reportActiveSession, deviceButton } = useOutletContext<LayoutContext>();
   const [phase, setPhase] = useState<Phase>({ kind: 'checking' });
   // 시작·종료가 실패했거나 예상과 다른 상태를 만났을 때 보여 줄 문구.
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -188,6 +193,7 @@ export function RecordPage() {
   const live = phase.kind === 'recording' || phase.kind === 'stopping' ? phase : null;
 
   // '녹음 종료' 버튼. 넓은 화면은 상태 줄 오른쪽, 좁은 화면은 맨 아래 넓은 버튼이다.
+  // 기기 버튼이 없으면 크고 채운 버튼, 있으면 작은 테두리 버튼이다(T43).
   function stopButton(session: Session, className: string) {
     const stopping = phase.kind === 'stopping';
     return (
@@ -195,13 +201,13 @@ export function RecordPage() {
         type="button"
         disabled={stopping}
         onClick={() => void handleStop(session)}
-        className={`${SMALL_BUTTON} ${className}`}
+        className={`${deviceButton ? SMALL_BUTTON : BIG_STOP_BUTTON} ${className}`}
       >
         {stopping ? (
           '종료하는 중…'
         ) : (
           <>
-            <StopIcon className="size-[13px]" />
+            <StopIcon className={deviceButton ? 'size-[13px]' : 'size-[15px]'} />
             녹음 종료
           </>
         )}
@@ -275,7 +281,7 @@ export function RecordPage() {
                 녹음하고 있지 않습니다
               </p>
               <p className="text-base leading-[1.7] text-muted">
-                기기의 버튼을 누르면 녹음이 시작되고,
+                {deviceButton ? '기기의 버튼을' : '녹음 시작을'} 누르면 녹음이 시작되고,
                 <br />
                 자막이 이 화면에 바로 나타납니다.
               </p>
@@ -283,13 +289,17 @@ export function RecordPage() {
                 type="button"
                 disabled={phase.kind === 'starting'}
                 onClick={() => void handleStart()}
-                className={`${SMALL_BUTTON} mt-1.5 flex`}
+                className={deviceButton ? `${SMALL_BUTTON} mt-1.5 flex` : `${BIG_START_BUTTON} mt-3 flex`}
               >
                 {phase.kind === 'starting' ? (
                   '시작하는 중…'
                 ) : (
                   <>
-                    <span className="size-[9px] rounded-full bg-rec" />
+                    <span
+                      className={
+                        deviceButton ? 'size-[9px] rounded-full bg-rec' : 'size-[11px] rounded-full bg-white'
+                      }
+                    />
                     녹음 시작
                   </>
                 )}
@@ -302,7 +312,11 @@ export function RecordPage() {
       )}
 
       <footer className="hidden h-[50px] flex-none items-center gap-2 border-t border-line px-12 text-[13px] text-faint md:flex">
-        <span>녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다.</span>
+        <span>
+          {deviceButton
+            ? '녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다.'
+            : '녹음은 이 화면의 버튼으로 시작·종료합니다.'}
+        </span>
         {live && (
           <span className="ml-auto tabular-nums">
             문장 {stream.transcript.finals.length.toLocaleString('ko-KR')}개

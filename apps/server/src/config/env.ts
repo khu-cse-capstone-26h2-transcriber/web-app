@@ -23,6 +23,8 @@ export interface Env {
   localStt: LocalSttEnv | null;
   // 있으면 웹의 녹음 시작·종료가 기기(audiostackd) ctrl.sock으로 간다 (HW-2).
   deviceCtrlSocket: string | null;
+  // 기기에 물리 녹음 버튼이 있는지(DEVICE_BUTTON=1). 없으면 웹 버튼이 녹음의 주 제어다 (T43).
+  deviceButton: boolean;
 }
 
 function fail(message: string): never {
@@ -60,6 +62,12 @@ export function loadEnv(): Env {
     localStt = { python: env.LOCAL_STT_PYTHON, script: env.LOCAL_STT_SCRIPT, wav: env.LOCAL_STT_WAV };
   }
 
+  // 비우거나 0이면 버튼 없음(기본), 1이면 있음. 잘못 쓴 값을 켤 때 알아채도록 다른 값은 받지 않는다.
+  const rawButton = process.env.DEVICE_BUTTON || '0';
+  if (rawButton !== '0' && rawButton !== '1') {
+    fail(`DEVICE_BUTTON은 비우거나 0(버튼 없음) 또는 1(버튼 있음)이어야 합니다: ${rawButton}`);
+  }
+
   return {
     port,
     dbUrl: DB_URL,
@@ -67,6 +75,7 @@ export function loadEnv(): Env {
     sttMode,
     localStt,
     deviceCtrlSocket: process.env.DEVICE_CTRL_SOCKET || null,
+    deviceButton: rawButton === '1',
   };
 }
 

@@ -44,7 +44,7 @@ flowchart LR
 | 실제 STT | AI 파트 `stt-engine` 저장소 (2026-11-18 공개로 바뀜) | 기기 안에서 음성을 인식합니다. `audiostackd`에게서 오디오를 받아 결과를 돌려주고, 데몬이 결과를 서버로 보냅니다 | 엔진은 보드 NPU에서 동작함(AI 파트, 2026-11-09). 서버는 데몬이 보낸 결과를 `/api/device/sessions`로 받아 세션에 넣음 (T20, 박지윤의 web-app PR #1 병합). 노트북에서 ONNX 엔진과 `feed_wav.py`로 웹 자막, DB, 히스토리, 내보내기까지 확인함 (T29, T20). 실제 데몬과 보드에서는 T26에서 확인. 수신 경로 이름은 하드웨어 파트 동의가 남음 (T19) |
 | 서버 | `apps/server` | 세션 시작/종료, SSE 전달, DB 저장, 히스토리 API | Express 서버가 뜨고 `GET /health`, 공통 에러 응답(`{ error: { code, message } }`), pg 연결 풀이 있음 (T04). 세션 시작·종료 API가 있고 시작하면 mock STT가 켜짐 (T06). final 세그먼트를 DB에 저장함 (T08). 녹음 중인 세션의 이벤트를 SSE로 보냄 (T07). 히스토리 목록·상세 API가 있음 (T10). 스트림에 다시 접속하면 빠진 final을 먼저 보냄 (T09). 끝난 세션을 txt·md 파일로 내보냄 (T11). 기기 결과 수신 경로 `/api/device/sessions` (T20) |
 | DB | `docker-compose.yml` (노트북 개발용) | 세션과 세그먼트를 저장합니다 | 로컬 PostgreSQL 16 컨테이너가 뜸 (T02). 스키마와 마이그레이션 있음 (T03). 세션은 저장함 (T06). 세그먼트도 저장함 (T08). 보드에서는 `apt`로 설치한 PostgreSQL 16을 씀 (T21). SQLite로 바꾸지 않음 (D8, 2026-11-22) |
-| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 보조 시작·종료 버튼 (T13). 녹음하지 않는 동안 2초마다 진행 중인 녹음 확인 (T20). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
+| 웹앱 | `apps/web` | 녹음 제어, 실시간 트랜스크립트, 히스토리 화면 | Vite + React 뼈대. 화면 주소(녹음, 히스토리 목록·상세), API 클라이언트, 서버로 넘기는 개발 서버 프록시가 있음 (T12). 녹음 화면에 녹음 상태와 시작·종료 버튼 (T13). 기기에 물리 버튼이 없으면(`DEVICE_BUTTON`, 기본) 시작·종료 버튼이 크게 보이는 주 제어 (T43). 녹음하지 않는 동안 2초마다 진행 중인 녹음 확인 (T20). 녹음 중에는 버튼 아래에 실시간 자막 (T14). 자막 스트림이 끊기면 맨 위 배너와 자동 재연결, 위쪽 서버 상태는 30초마다 다시 확인 (T15). 히스토리 목록, 문장별 시각이 붙은 상세, txt·md 내려받기 버튼 (T16) |
 | 공용 타입 | `packages/shared` | 서버와 웹이 함께 쓰는 타입과 상수 | `APP_NAME`, `SttEvent`, `Session`, `SessionSummary`, `Segment`, `SessionStreamMessage`, `STREAM_HEARTBEAT_MS`, `ExportFormat`, `EXPORT_FORMATS` |
 
 ## 기술 결정
@@ -67,6 +67,7 @@ flowchart LR
 | STT | Node 내부 mock STT로 시작해 실제 STT로 교체 |
 | 테스트 | Vitest 5, 핵심 로직만(내보내기 포매터, 이벤트 재개, 세그먼트 병합). 루트에서 `npm test` (T17) |
 | 백엔드 위치 | Rubik Pi 안. 보드 한 대에서 엔진, 앱 서버, PostgreSQL을 함께 돌려 동작을 확인함 (T26 2026-11-16, T27 2026-11-18) |
+| 녹음 시작·종료 | 시연 때 물리 버튼이 없을 수 있어, 웹 버튼을 주 제어로 함. 서버 `.env`의 `DEVICE_BUTTON=1`이면 기기 버튼이 주 제어이고 웹 버튼은 보조(작게). '중단'은 종료와 같고 일시정지는 없음 (2026-11-25 앱 파트 결정, T43. 2026-10-20 결정 '물리 버튼이 주 제어'를 바꿈). 웹 버튼은 `DEVICE_CTRL_SOCKET`이 있으면 데몬 `ctrl.sock`에 `session start`·`session stop`을 보냄 (HW-2, T27 보드 확인) |
 | 보드의 DB | PostgreSQL 16을 그대로 씀. SQLite로 바꾸지 않고 메모리 설정은 기본값 (D8, 2026-11-22 앱 파트 결정. 2차 멘토링 의견, T26 측정: 19분 녹음 중 PostgreSQL 약 30 MB, 전체 7.1 GiB 중 최대 약 1.28 GB 사용) |
 | 기기 OS | Rubik Pi 3에 Ubuntu 24.04 (2026-11-10 앱 파트 결정, 기기는 앱 파트가 보관). AI 파트가 측정한 보드도 Ubuntu 24.04 (2026-11-09) |
 | STT 엔진 | `seastar105/whisper-small-komixv2`를 QNN으로 변환해 NPU에서 실행. `audiostackd`의 `engine.sock`에 접속하는 별도 프로그램(`stt-engine` 저장소). 결과 형식과 세션 처리 규칙은 `stt-engine`의 `ENGINE_CONTRACT.md` (AI 파트 결정, 2026-11-09) |
@@ -86,7 +87,7 @@ speech-transcriber/
 ├─ TODO.md                    # 작업 목록과 작업 기록
 ├─ package.json               # npm workspaces, 공통 스크립트
 ├─ tsconfig.base.json         # 공통 컴파일러 옵션
-├─ .env.example               # PORT, DB_URL, STT_URL, STT_MODE, LOCAL_STT_* (복사해서 .env로 씀)
+├─ .env.example               # PORT, DB_URL, STT_URL, STT_MODE, LOCAL_STT_*, DEVICE_CTRL_SOCKET, DEVICE_BUTTON (복사해서 .env로 씀)
 ├─ .nvmrc                     # 개발 Node 판 (22.22.0)
 ├─ .npmrc                     # engine-strict=true (다른 Node 판에서는 설치 실패)
 ├─ docker-compose.yml         # 로컬 개발용 PostgreSQL 16
@@ -161,6 +162,7 @@ speech-transcriber/
 │        ├─ index.ts
 │        ├─ export.ts         # ExportFormat 타입, EXPORT_FORMATS (내보내기 형식)
 │        ├─ format.ts         # 시작 시각, 문장 앞 시각, 녹음 길이, 상태 이름 (내보내기 파일과 히스토리 화면이 같이 씀)
+│        ├─ health.ts         # Health 타입 (/health 응답, 기기 버튼이 있는지, T43)
 │        ├─ segment.ts        # Segment 타입 (저장된 세그먼트)
 │        ├─ session.ts        # Session, SessionSummary 타입
 │        ├─ stream.ts         # SessionStreamMessage 타입, heartbeat 간격
@@ -193,9 +195,9 @@ npm run dev:stt      # mock STT 이벤트를 콘솔에 출력
 
 `npm test`는 루트 `vitest.config.ts`에 따라 `apps/*/src`, `packages/*/src` 아래의 `*.test.ts`만 돌립니다. 저장소 안 `.claude/worktrees/`의 다른 작업 트리는 보지 않습니다. `SessionManager` 테스트는 DB 함수를 테스트 안에서 가짜로 바꾸므로 DB가 꺼져 있어도 됩니다. 고치면서 계속 돌려 보려면 `npx vitest`(감시 모드)를 씁니다(T17).
 
-`dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok"}`를 내면 서버와 DB가 모두 살아 있는 것이고, DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다. 다른 API도 DB에 닿지 못해 실패하면 `503` `DB_UNAVAILABLE`로 답합니다(T13).
+`dev:server`는 `.env`의 `PORT`(예시 값 3000)에서 요청을 받습니다. `curl localhost:3000/health`가 `{"status":"ok","deviceButton":false}`를 내면 서버와 DB가 모두 살아 있는 것이고(`deviceButton`은 아래 `DEVICE_BUTTON`, T43), DB에 연결하지 못하면 503을 냅니다. 없는 경로와 서버 오류는 모두 `{ "error": { "code", "message" } }` 모양의 JSON으로 응답합니다. 다른 API도 DB에 닿지 못해 실패하면 `503` `DB_UNAVAILABLE`로 답합니다(T13).
 
-`PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `STT_MODE`는 비워 두면 mock이고, `local`이면 `LOCAL_STT_PYTHON`, `LOCAL_STT_SCRIPT`, `LOCAL_STT_WAV`도 있어야 합니다(빠지면 같은 방식으로 종료 코드 1). `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
+`PORT`, `DB_URL`, `STT_URL` 중 빠진 값이 있으면 `dev:server`는 빠진 변수 이름을 알리고 종료 코드 1로 끝납니다. `STT_MODE`는 비워 두면 mock이고, `local`이면 `LOCAL_STT_PYTHON`, `LOCAL_STT_SCRIPT`, `LOCAL_STT_WAV`도 있어야 합니다(빠지면 같은 방식으로 종료 코드 1). `DEVICE_BUTTON`은 기기에 물리 녹음 버튼이 있으면 `1`, 비우거나 `0`이면 없음(기본)이고, 다른 값이면 종료 코드 1로 끝납니다(T43). 서버는 켤 때 `device button - 없음 (웹 버튼이 주 제어)`처럼 기록합니다. `docker compose down`은 데이터를 지우지 않습니다. 데이터까지 지우려면 `docker compose down -v`를 씁니다.
 
 실제 모델로 받아쓰기를 해 보려면(T28 실험) 저장소 밖 `~/Desktop/stt-lab`의 가상환경과 엔진이 있어야 합니다. 준비 방법은 그 폴더의 `README.md`에 있습니다. 서버는 아래처럼 띄우며, 경로는 모두 절대 경로입니다. 웹에서 '녹음 시작'을 누르면 엔진이 모델을 불러오느라 시작까지 10초 가까이 걸립니다.
 
@@ -213,7 +215,7 @@ npm run dev:server
 
 | 주소 | 화면 | 상태 |
 | --- | --- | --- |
-| `/` | 녹음 | 녹음 상태와 보조 시작·종료 버튼 (T13), 녹음 중 실시간 자막 (T14) |
+| `/` | 녹음 | 녹음 상태와 시작·종료 버튼 (T13, 기기 버튼이 없으면 크게 T43), 녹음 중 실시간 자막 (T14) |
 | `/history` | 히스토리 목록 | 끝난 녹음을 최근 것부터 카드로, 누르면 상세로 (T16, 모양 T40) |
 | `/history/:id` | 히스토리 상세 | 머리말(시작, 길이, 상태), txt·md 내려받기 버튼, 문장별 시각 (T16, 모양 T40) |
 | 그 밖의 주소 | 페이지를 찾을 수 없음 | |
@@ -224,7 +226,17 @@ npm run dev:server
 
 서버 상태는 `/health`를 불러 `서버 정상`(초록 점), `서버 확인 중`(노란 점), 또는 빨간 점과 `서버: DB에 연결하지 못했습니다`, `서버: 서버에 연결하지 못했습니다`, `서버: 서버가 답하지 않습니다` 중 하나로 보여 줍니다. 웹앱을 열 때, 그 뒤 30초마다, 녹음 화면의 자막 스트림이 다시 연결될 때 다시 확인합니다(T15). 확인이 실패하면 성공할 때까지 5초마다 다시 확인하므로, 서버가 다시 켜지면 새로고침하지 않아도 늦어도 5초 안에 `서버 정상`으로 돌아옵니다. `/health`가 5초 안에 답하지 않으면(서버가 멈춤) `서버가 답하지 않습니다`로 보입니다(T25). 다시 확인하는 동안에는 직전 결과를 그대로 보여 줍니다.
 
-녹음 화면(T13)은 화면을 열 때 `GET /api/sessions/active`로 진행 중인 녹음을 확인합니다. 녹음 중이면 위쪽 상태 줄에 빨간 `녹음 중` 알약, 큰 흐른 시간, `#12 · 2026-11-18 14:05 시작`, 작은 '녹음 종료' 버튼을 보여 줍니다. 아니면 가운데에 점선 원과 마이크, `녹음하고 있지 않습니다`, 안내 두 줄, 작은 '녹음 시작' 버튼을 보여 줍니다(T39, 확정안 F-1·F-2). 넓은 화면 맨 아래에는 안내 줄(`녹음은 기기의 버튼으로 시작·종료합니다…`)과 녹음 중 `문장 N개`가 있습니다. 좁은 화면은 상태 줄에 알약·시간·`#12`만 두고 '녹음 종료'를 맨 아래 넓은 버튼으로 둡니다(F-5). 안내 문구(이미 진행 중, 다른 녹음으로 바뀜, 이미 끝남)는 노랑, 실패 문구는 빨강입니다. 녹음의 주 제어는 기기의 물리 버튼이고, 화면의 '녹음 시작'·'녹음 종료' 버튼은 개발·시연·원격 종료용 보조 수단입니다.
+녹음 화면(T13)은 화면을 열 때 `GET /api/sessions/active`로 진행 중인 녹음을 확인합니다. 녹음 중이면 위쪽 상태 줄에 빨간 `녹음 중` 알약, 큰 흐른 시간, `#12 · 2026-11-18 14:05 시작`, '녹음 종료' 버튼을 보여 줍니다. 아니면 가운데에 점선 원과 마이크, `녹음하고 있지 않습니다`, 안내 두 줄, '녹음 시작' 버튼을 보여 줍니다(T39, 확정안 F-1·F-2). 넓은 화면 맨 아래에는 안내 줄과 녹음 중 `문장 N개`가 있습니다. 좁은 화면은 상태 줄에 알약·시간·`#12`만 두고 '녹음 종료'를 맨 아래 넓은 버튼으로 둡니다(F-5). 안내 문구(이미 진행 중, 다른 녹음으로 바뀜, 이미 끝남)는 노랑, 실패 문구는 빨강입니다.
+
+버튼 모양과 안내는 기기에 물리 녹음 버튼이 있는지(`/health`의 `deviceButton`, 서버 `.env`의 `DEVICE_BUTTON`)에 따라 다릅니다(T43). 틀이 서버 상태를 확인할 때 함께 받고, 확인이 실패하는 동안에는 마지막 값을 둡니다. 한 번도 받지 못했으면 버튼 없음으로 봅니다.
+
+| | 버튼 없음 (기본, 시연) | 버튼 있음 (`DEVICE_BUTTON=1`) |
+| --- | --- | --- |
+| 녹음의 주 제어 | 화면의 '녹음 시작'·'녹음 종료' | 기기의 물리 버튼. 화면 버튼은 개발·시연·원격 종료용 보조 |
+| '녹음 시작' | 채운 빨간 큰 알약 버튼 | 작은 테두리 버튼 |
+| '녹음 종료' | 채운 흰 큰 버튼 | 작은 테두리 버튼 |
+| 대기 안내 | `녹음 시작을 누르면 녹음이 시작되고, 자막이 이 화면에 바로 나타납니다.` | `기기의 버튼을 누르면 …` |
+| 아래 안내 줄 | `녹음은 이 화면의 버튼으로 시작·종료합니다.` | `녹음은 기기의 버튼으로 시작·종료합니다. 이 화면의 버튼은 보조용입니다.` |
 
 | 상황 | 화면 |
 | --- | --- |
@@ -234,6 +246,7 @@ npm run dev:server
 | 웹 버튼 녹음 중 기기가 새 세션을 시작함 | 서버가 웹 버튼 세션을 `interrupted`로 닫음. 끊김 배너가 잠깐 보인 뒤 같은 화면에 새 녹음과 `#5 녹음이 끝나, 진행 중인 녹음(#6)을 보여 줍니다`. 새 녹음이 끝나면 `/history/6` (T20) |
 | 시작했는데 이미 녹음 중 (`409`) | 진행 중인 녹음을 다시 확인해 보여 주고 `이미 진행 중인 녹음이 있어 그 녹음을 보여 줍니다` |
 | 종료했는데 이미 끝남 (`409`, `404`) | 다시 확인하고 `이미 끝난 녹음입니다 (#12)` |
+| 시작했는데 기기에 닿지 못함 (`503` `DEVICE_UNAVAILABLE`) | `녹음을 시작하지 못했습니다: 기기에 연결하지 못했습니다. 기기의 녹음 프로그램이 켜져 있는지 확인해 주세요`. 이유(소켓 경로가 든 `connect ENOENT` 등)는 서버 기록 `[device] session start → 연결 실패: …`에만 (T43) |
 | 시작·종료 중 DB가 꺼짐 (`503`) | `녹음을 시작하지 못했습니다: DB에 연결하지 못했습니다`, 또는 `녹음을 종료하지 못했습니다: … 잠시 뒤 다시 종료해 주세요`. 종료 실패 때는 녹음 중으로 남아 다시 누를 수 있음 |
 | 서버가 꺼짐 | `녹음 상태를 확인하지 못했습니다: 서버에 연결하지 못했습니다`와 '다시 확인' 버튼 |
 
@@ -322,7 +335,7 @@ curl localhost:3000/api/sessions/active           # 진행 중인 세션
 curl -X POST localhost:3000/api/sessions/1/stop   # 종료 (1은 시작할 때 받은 id)
 ```
 
-기기(물리 버튼)로 시작한 녹음은 아래 '기기 결과 수신 경로'로 들어옵니다. 웹 버튼으로 기기 녹음을 시작·종료하는 일은 T27(`ctrl.sock`)에서 합니다.
+기기(물리 버튼)로 시작한 녹음은 아래 '기기 결과 수신 경로'로 들어옵니다. `DEVICE_CTRL_SOCKET`이 있으면 웹 버튼(`POST /api/sessions`, `/stop`)이 데몬 `ctrl.sock`에 `session start`·`session stop`을 보냅니다(web-app PR #2, T27 보드 확인). 기기에 닿지 못하면 시작은 `503` `DEVICE_UNAVAILABLE`, 기기가 거절하면 `502` `DEVICE_ERROR`이고 둘 다 서버 기록에 남습니다(T43). 종료 때 기기에 닿지 못하면 서버에서 닫습니다. 보드의 데몬은 대기 상태(`--idle` 또는 `[session] autostart = false`)로 켜야 합니다.
 
 ## 기기 결과 수신 경로
 
@@ -563,7 +576,7 @@ await adapter.stop();
 ## 관련 문서
 
 - [`TODO.md`](../TODO.md): 작업 목록, 우선순위, 팀원 합의가 필요한 항목, 작업 기록
-- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 기기 결과 수신 경로 병합과 시험은 [`T20.md`](guides/T20.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md), 노트북 실제 모델 시험은 [`T29.md`](guides/T29.md)
+- [`docs/guides/`](guides/): 작업별 지침서. STT 어댑터는 [`T05.md`](guides/T05.md), 세션 API는 [`T06.md`](guides/T06.md), SSE 스트림은 [`T07.md`](guides/T07.md), 세그먼트 저장은 [`T08.md`](guides/T08.md), SSE 이어받기는 [`T09.md`](guides/T09.md), 히스토리 API는 [`T10.md`](guides/T10.md), 내보내기는 [`T11.md`](guides/T11.md), 웹앱 뼈대는 [`T12.md`](guides/T12.md), 히스토리 화면은 [`T16.md`](guides/T16.md), 단위 테스트는 [`T17.md`](guides/T17.md), STT 연동 합의 초안은 [`T19.md`](guides/T19.md), 기기 결과 수신 경로 병합과 시험은 [`T20.md`](guides/T20.md), 실제 모델 서버 연동 실험은 [`T28.md`](guides/T28.md), 노트북 실제 모델 시험은 [`T29.md`](guides/T29.md), 웹 버튼 주 제어(물리 버튼 없는 시연)는 [`T43.md`](guides/T43.md)
 - [`docs/device-ingest.md`](device-ingest.md): 보드 없이 Mac에서 기기 연동을 시험하는 방법
 - [`docs/d4-stt-questions.md`](d4-stt-questions.md): D4 협의에서 AI·하드웨어 파트에 물어볼 질문 목록과 답
 - [`docs/team-questions.md`](team-questions.md): 팀원에게 물을 것의 현황. 팀 저장소에서 답을 찾은 것과 아직 물어야 할 것
